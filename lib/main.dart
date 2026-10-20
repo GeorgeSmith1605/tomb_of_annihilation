@@ -64,6 +64,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
   List<dynamic> _puzzles = [];
   List<dynamic> _guides = [];
   List<dynamic> _dinosaurs = [];
+  List<dynamic> _factions = [];
   dynamic _activeGuide;
 
   final Map<String, String> _locationNotes = {};
@@ -94,6 +95,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     _loadPuzzles();
     _loadGuides();
     _loadDinosaurs();
+    _loadFactions();
     _loadCampaignState();
   }
 
@@ -153,6 +155,19 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     setState(() {
       _notesController.text = savedNote;
     });
+  }
+
+  Future<void> _loadFactions() async {
+    try {
+      final String response =
+          await rootBundle.loadString('assets/data/factions.json');
+      final data = json.decode(response);
+      setState(() {
+        _factions = data;
+      });
+    } catch (e) {
+      debugPrint("Error loading factions: $e");
+    }
   }
 
   Future<void> _loadDinosaurs() async {
@@ -261,6 +276,98 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     } catch (e) {
       debugPrint("Error loading trickster gods: $e");
     }
+  }
+
+  void _openFactionsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return DefaultTabController(
+          length: _factions.length,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF222222),
+            title: const Row(
+              children: [
+                Icon(Icons.groups, color: Colors.amber),
+                SizedBox(width: 10),
+                Text('Торгові Принці та Фракції',
+                    style: TextStyle(color: Colors.amber)),
+              ],
+            ),
+            content: SizedBox(
+              width: 680,
+              height: 520,
+              child: Column(
+                children: [
+                  TabBar(
+                    indicatorColor: Colors.amber,
+                    labelColor: Colors.amber,
+                    unselectedLabelColor: Colors.white60,
+                    tabs: _factions
+                        .map<Widget>((f) => Tab(text: f['category'].toString()))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: TabBarView(
+                      children: _factions.map<Widget>((group) {
+                        final members = group['members'] as List<dynamic>;
+                        return ListView.builder(
+                          itemCount: members.length,
+                          itemBuilder: (context, index) {
+                            final m = members[index];
+                            return Card(
+                              color: const Color(0xFF2E2E2E),
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ExpansionTile(
+                                title: Text(m['name'],
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.amber,
+                                        fontSize: 14)),
+                                subtitle: Text(m['role'],
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.white70)),
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Опис: ${m['details']}',
+                                            style: const TextStyle(
+                                                fontSize: 13, height: 1.3)),
+                                        const SizedBox(height: 6),
+                                        Text('Секрет для ДМ: ${m['secret']}',
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.redAccent)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Закрити',
+                    style: TextStyle(color: Colors.amber)),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _openDinoRaceDialog() {
@@ -983,6 +1090,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         title: const Text('ToA DM Companion — Desktop Workspace'),
         backgroundColor: const Color(0xFF111111),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.groups, color: Colors.amber),
+            tooltip: 'Торгові Принці та Фракції',
+            onPressed: _openFactionsDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.directions_run, color: Colors.amber),
             tooltip: 'Перегони Динозаврів',

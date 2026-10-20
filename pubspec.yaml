@@ -27,4 +27,5 @@ flutter:
     - assets/data/puzzles.json
     - assets/data/guides.json
     - assets/data/dinosaurs.json
+    - assets/data/factions.json
     - assets/images/
