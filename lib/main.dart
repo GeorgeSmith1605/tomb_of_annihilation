@@ -34,12 +34,15 @@ class MainDMDesktopScreen extends StatefulWidget {
 
 class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     with SingleTickerProviderStateMixin {
-  // Список локацій та стан карты
+  // Список локацій та стан карти
   List<dynamic> _locations = [];
   dynamic _selectedLocation;
   String _searchQuery = '';
   int _currentDay = 1;
   bool _showMap = false;
+
+  // Монстри та Бестіарій
+  List<dynamic> _monsters = [];
 
   // Подорож та зустрічі
   Map<String, dynamic> _encounterTables = {};
@@ -60,12 +63,27 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     _loadLocations();
     _loadEncounters();
     _loadTricksterGods();
+    _loadMonsters();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadMonsters() async {
+    try {
+      final String response = await rootBundle.loadString(
+        'assets/data/monsters.json',
+      );
+      final data = await json.decode(response);
+      setState(() {
+        _monsters = data;
+      });
+    } catch (e) {
+      debugPrint("Error loading monsters: $e");
+    }
   }
 
   Future<void> _loadLocations() async {
@@ -111,6 +129,143 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     } catch (e) {
       debugPrint("Error loading trickster gods: $e");
     }
+  }
+
+  void _openBestiaryDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String searchMonster = '';
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final filteredMonsters = _monsters.where((m) {
+              return m['name'].toString().toLowerCase().contains(
+                    searchMonster.toLowerCase(),
+                  ) ||
+                  m['type'].toString().toLowerCase().contains(
+                    searchMonster.toLowerCase(),
+                  );
+            }).toList();
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF222222),
+              title: const Text(
+                'Бестіарій та Статблоки',
+                style: TextStyle(color: Colors.amber),
+              ),
+              content: SizedBox(
+                width: 600,
+                height: 500,
+                child: Column(
+                  children: [
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Пошук монстра або НПС...',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: const Color(0xFF333333),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onChanged: (val) =>
+                          setModalState(() => searchMonster = val),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filteredMonsters.length,
+                        itemBuilder: (context, index) {
+                          final m = filteredMonsters[index];
+                          final stats = m['stats'];
+                          return Card(
+                            color: const Color(0xFF2E2E2E),
+                            child: ExpansionTile(
+                              title: Text(
+                                m['name'],
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${m['type']} • CR: ${m['cr']} • КД: ${m['ac']} • ХП: ${m['hp']}',
+                              ),
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Характеристики: СИЛ ${stats['str']} | СПР ${stats['dex']} | ТІЛ ${stats['con']} | ІНТ ${stats['int']} | МУД ${stats['wis']} | ХАР ${stats['cha']}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'Особливості:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.amber,
+                                        ),
+                                      ),
+                                      ...(m['traits'] as List).map(
+                                        (t) => Text(
+                                          '• $t',
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'Дії:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.redAccent,
+                                        ),
+                                      ),
+                                      ...(m['actions'] as List).map(
+                                        (a) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 4.0,
+                                          ),
+                                          child: Text(
+                                            '• ${a['name']}: ${a['desc']}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text(
+                    'Закрити',
+                    style: TextStyle(color: Colors.amber),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _rollDailyEncounter() {
@@ -161,6 +316,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         title: const Text('ToA DM Companion — Desktop Workspace'),
         backgroundColor: const Color(0xFF111111),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.adb, color: Colors.amber),
+            tooltip: 'Швидкий бестіарій',
+            onPressed: _openBestiaryDialog,
+          ),
           IconButton(
             icon: Icon(
               _showMap ? Icons.article : Icons.map,
@@ -358,11 +518,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      // Вкладка 1: Подорож
                       _buildTravelTab(),
-                      // Вкладка 2: Прокляття та Хвороби
                       _buildCurseTab(),
-                      // Вкладка 3: Боги Ому
                       _buildGodsTab(),
                     ],
                   ),
@@ -375,7 +532,6 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     );
   }
 
-  // Віджет Вкладки 1: Подорож
   Widget _buildTravelTab() {
     return Padding(
       padding: const EdgeInsets.all(12.0),
@@ -497,7 +653,6 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     );
   }
 
-  // Віджет Вкладки 2: Прокляття Смерті та Хвороби
   Widget _buildCurseTab() {
     final hpLostPerResurrected = _currentDay;
     return ListView(
@@ -601,7 +756,6 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     );
   }
 
-  // Віджет Вкладки 3: Боги Ому
   Widget _buildGodsTab() {
     return _tricksterGods.isEmpty
         ? const Center(child: CircularProgressIndicator())
