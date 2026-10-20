@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,6 +63,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
   List<dynamic> _rumors = [];
   List<dynamic> _puzzles = [];
   List<dynamic> _guides = [];
+  List<dynamic> _dinosaurs = [];
   dynamic _activeGuide;
 
   final Map<String, String> _locationNotes = {};
@@ -91,6 +93,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     _loadRumors();
     _loadPuzzles();
     _loadGuides();
+    _loadDinosaurs();
     _loadCampaignState();
   }
 
@@ -150,6 +153,19 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     setState(() {
       _notesController.text = savedNote;
     });
+  }
+
+  Future<void> _loadDinosaurs() async {
+    try {
+      final String response =
+          await rootBundle.loadString('assets/data/dinosaurs.json');
+      final data = json.decode(response);
+      setState(() {
+        _dinosaurs = data;
+      });
+    } catch (e) {
+      debugPrint("Error loading dinosaurs: $e");
+    }
   }
 
   Future<void> _loadGuides() async {
@@ -245,6 +261,175 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     } catch (e) {
       debugPrint("Error loading trickster gods: $e");
     }
+  }
+
+  void _openDinoRaceDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String raceLog =
+            'Натисніть "Запустити забіг", щоб симулювати перегони на 300 футів!';
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            void runRaceSimulation() {
+              final rng = Random();
+              Map<String, int> distances = {};
+              for (var dino in _dinosaurs) {
+                distances[dino['name']] = 0;
+              }
+
+              List<String> logEntries = [];
+              logEntries.add('🏁 СТАРТ ПЕРЕГОНІВ ДИНОЗАВРІВ!');
+
+              int round = 1;
+              bool finished = false;
+              String winner = '';
+
+              while (!finished && round <= 10) {
+                logEntries.add('\n--- Раунд $round ---');
+                for (var dino in _dinosaurs) {
+                  final name = dino['name'] as String;
+                  final baseSpeed = dino['speed'] as int;
+                  final skillDc = dino['skillCheck'] as int;
+
+                  final roll = rng.nextInt(20) + 1;
+                  int actualMove = baseSpeed;
+
+                  if (roll >= skillDc) {
+                    actualMove += (rng.nextInt(6) + 1) * 5;
+                    logEntries.add(
+                        '• $name: Кидок $roll (Успіх). Просунувся на $actualMove фт.');
+                  } else {
+                    actualMove = (baseSpeed / 2).round();
+                    logEntries.add(
+                        '• $name: Кидок $roll (Провал всадника). Сповільнився до $actualMove фт.');
+                  }
+
+                  distances[name] = (distances[name] ?? 0) + actualMove;
+
+                  if (distances[name]! >= 300 && !finished) {
+                    finished = true;
+                    winner = name;
+                  }
+                }
+                round++;
+              }
+
+              logEntries.add('\n🏆 ПЕРЕМОЖЕЦЬ: $winner!');
+
+              setModalState(() {
+                raceLog = logEntries.join('\n');
+              });
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF222222),
+              title: const Row(
+                children: [
+                  Icon(Icons.directions_run, color: Colors.amber),
+                  SizedBox(width: 10),
+                  Text('Перегони Динозаврів (Dinosaur Races)',
+                      style: TextStyle(color: Colors.amber)),
+                ],
+              ),
+              content: SizedBox(
+                width: 700,
+                height: 540,
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: ListView.builder(
+                        itemCount: _dinosaurs.length,
+                        itemBuilder: (context, index) {
+                          final d = _dinosaurs[index];
+                          return Card(
+                            color: const Color(0xFF2E2E2E),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(d['name'],
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.amber,
+                                          fontSize: 13)),
+                                  Text('${d['type']} • Ставки: ${d['odds']}',
+                                      style: const TextStyle(
+                                          fontSize: 11, color: Colors.white70)),
+                                  const SizedBox(height: 4),
+                                  Text('Базова швидкість: ${d['speed']} фт.',
+                                      style: const TextStyle(fontSize: 11)),
+                                  Text('DC контролю: ${d['skillCheck']}',
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.greenAccent)),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const VerticalDivider(width: 16, color: Colors.white24),
+                    Expanded(
+                      flex: 1,
+                      child: Column(
+                        children: [
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber.shade700,
+                              minimumSize: const Size.fromHeight(40),
+                            ),
+                            icon: const Icon(Icons.play_arrow,
+                                color: Colors.black),
+                            label: const Text('Запустити забіг (300 фт)',
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold)),
+                            onPressed: runRaceSimulation,
+                          ),
+                          const SizedBox(height: 10),
+                          Expanded(
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF151515),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.white12),
+                              ),
+                              child: SingleChildScrollView(
+                                child: Text(
+                                  raceLog,
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      height: 1.3,
+                                      fontFamily: 'monospace'),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Закрити',
+                      style: TextStyle(color: Colors.amber)),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _openGuidesDialog() {
@@ -798,6 +983,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         title: const Text('ToA DM Companion — Desktop Workspace'),
         backgroundColor: const Color(0xFF111111),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.directions_run, color: Colors.amber),
+            tooltip: 'Перегони Динозаврів',
+            onPressed: _openDinoRaceDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.person_pin_circle, color: Colors.amber),
             tooltip: 'Проводники Чульта',
