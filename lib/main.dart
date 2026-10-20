@@ -52,20 +52,17 @@ class MainDMDesktopScreen extends StatefulWidget {
 
 class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     with SingleTickerProviderStateMixin {
-  // Список локацій та стан карти
   List<dynamic> _locations = [];
   dynamic _selectedLocation;
   String _searchQuery = '';
   int _currentDay = 1;
   bool _showMap = false;
 
-  // Монстри, Бестіарій та Слухи
   List<dynamic> _monsters = [];
   List<dynamic> _rumors = [];
   final Map<String, String> _locationNotes = {};
   final TextEditingController _notesController = TextEditingController();
 
-  // Подорож та зустрічі
   Map<String, dynamic> _encounterTables = {};
   String _selectedBiome = 'jungle_normal';
   String _lastEncounterResult =
@@ -73,7 +70,6 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
   int _rationsLeft = 20;
   int _waterGallonsLeft = 30;
 
-  // Прокляття, Боги Ому та Бій
   List<dynamic> _tricksterGods = [];
   List<Combatant> _combatants = [];
   int _activeCombatantIndex = 0;
@@ -141,7 +137,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       final String response = await rootBundle.loadString(
         'assets/data/rumors.json',
       );
-      final data = await json.decode(response);
+      final data = json.decode(response);
       setState(() {
         _rumors = data;
       });
@@ -155,7 +151,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       final String response = await rootBundle.loadString(
         'assets/data/monsters.json',
       );
-      final data = await json.decode(response);
+      final data = json.decode(response);
       setState(() {
         _monsters = data;
       });
@@ -169,7 +165,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       final String response = await rootBundle.loadString(
         'assets/data/locations.json',
       );
-      final data = await json.decode(response);
+      final data = json.decode(response);
       setState(() {
         _locations = data;
         if (_locations.isNotEmpty) {
@@ -187,7 +183,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       final String response = await rootBundle.loadString(
         'assets/data/encounters.json',
       );
-      final data = await json.decode(response);
+      final data = json.decode(response);
       setState(() {
         _encounterTables = data;
       });
@@ -201,7 +197,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       final String response = await rootBundle.loadString(
         'assets/data/trickster_gods.json',
       );
-      final data = await json.decode(response);
+      final data = json.decode(response);
       setState(() {
         _tricksterGods = data;
       });
@@ -325,7 +321,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                               ),
                               trailing: IconButton(
                                 icon: const Icon(
-                                  Icons.add_swords,
+                                  Icons.shield,
                                   color: Colors.redAccent,
                                 ),
                                 tooltip: 'Додати в трекер бою',
@@ -675,7 +671,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
           ),
           const VerticalDivider(width: 1, color: Colors.white12),
 
-          // Панель 2: Зміст локації + Нотатки ДМ або Карта
+          // Панель 2: Зміст локації + Карта / Нотатки
           Expanded(
             flex: 3,
             child: _showMap
@@ -827,84 +823,132 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
   }
 
   Widget _buildTravelTab() {
-    Return Padding(
-      Padding: const EdgeInsets.all(12.0),
-      Child: ListView(
-        Children: [
-          // Блок ресурсів
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: ListView(
+        children: [
           Container(
-            Padding: const EdgeInsets.all(10),
-            Decoration: BoxDecoration(color: const Color(0xFF282828), borderRadius: BorderRadius.circular(8)),
-            Child: Column(
-              Children: [
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF282828),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
                 Row(
-                  MainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  Children: [
-                    Const Text('Харчі (Раціони):'),
-                    Text('$_rationsLeft дн.', Style: TextStyle(color: _rationsLeft < 5 ? Colors.red : Colors.green, fontWeight: FontWeight.bold)),
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Харчі (Раціони):'),
+                    Text(
+                      '$_rationsLeft дн.',
+                      style: TextStyle(
+                        color: _rationsLeft < 5 ? Colors.red : Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
-                Const SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Row(
-                  MainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  Children: [
-                    Const Text('Вода (Галони):'),
-                    Text('$_waterGallonsLeft гал.', Style: TextStyle(color: _waterGallonsLeft < 10 ? Colors.red : Colors.blue, fontWeight: FontWeight.bold)),
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Вода (Галони):'),
+                    Text(
+                      '$_waterGallonsLeft гал.',
+                      style: TextStyle(
+                        color: _waterGallonsLeft < 10
+                            ? Colors.red
+                            : Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
           ),
-          Const SizedBox(height: 12),
+          const SizedBox(height: 12),
 
-          // Віджет Навігації та Погоди
           HexNavigationWidget(
-            OnResourceUpdate: (rationCost, waterCost) {
-              SetState(() {
+            onResourceUpdate: (rationCost, waterCost) {
+              setState(() {
                 _rationsLeft = (_rationsLeft - rationCost).clamp(0, 999);
-                _waterGallonsLeft = (_waterGallonsLeft - waterCost).clamp(0, 999);
+                _waterGallonsLeft = (_waterGallonsLeft - waterCost).clamp(
+                  0,
+                  999,
+                );
               });
               _saveCampaignState();
             },
           ),
-          Const SizedBox(height: 12),
+          const SizedBox(height: 12),
 
-          // Вибір біома та генератор зустрічей
-          Const Text('Поточний біом:', style: TextStyle(fontSize: 12, color: Colors.white70)),
+          const Text(
+            'Поточний біом:',
+            style: TextStyle(fontSize: 12, color: Colors.white70),
+          ),
           DropdownButton<String>(
-            Value: _selectedBiome,
-            IsExpanded: true,
-            DropdownColor: const Color(0xFF2A2A2A),
-            Items: const [
-              DropdownMenuItem(value: 'jungle_normal', child: Text('Джунглі (Нормальна загроза)')),
-              DropdownMenuItem(value: 'undead_high', child: Text('Зона високої нежиті')),
+            value: _selectedBiome,
+            isExpanded: true,
+            dropdownColor: const Color(0xFF2A2A2A),
+            items: const [
+              DropdownMenuItem(
+                value: 'jungle_normal',
+                child: Text('Джунглі (Нормальна загроза)'),
+              ),
+              DropdownMenuItem(
+                value: 'undead_high',
+                child: Text('Зона високої нежиті'),
+              ),
             ],
-            OnChanged: (val) {
-              If (val != null) {
-                SetState(() => _selectedBiome = val);
+            onChanged: (val) {
+              if (val != null) {
+                setState(() => _selectedBiome = val);
                 _saveCampaignState();
               }
             },
           ),
-          Const SizedBox(height: 8),
+          const SizedBox(height: 8),
           ElevatedButton.icon(
-            Style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade700, minimumSize: const Size.fromHeight(38)),
-            Icon: const Icon(Icons.arrow_forward, color: Colors.black, size: 18),
-            Label: const Text('Провести день (+1 день)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-            OnPressed: _advanceDay,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber.shade700,
+              minimumSize: const Size.fromHeight(38),
+            ),
+            icon: const Icon(
+              Icons.arrow_forward,
+              color: Colors.black,
+              size: 18,
+            ),
+            label: const Text(
+              'Провести день (+1 день)',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            onPressed: _advanceDay,
           ),
-          Const SizedBox(height: 6),
+          const SizedBox(height: 6),
           OutlinedButton.icon(
-            Style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(34)),
-            Icon: const Icon(Icons.casino, size: 16),
-            Label: const Text('Кидок зустрічі (d20)'),
-            OnPressed: _rollDailyEncounter,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(34),
+            ),
+            icon: const Icon(Icons.casino, size: 16),
+            label: const Text('Кидок зустрічі (d20)'),
+            onPressed: _rollDailyEncounter,
           ),
-          Const SizedBox(height: 10),
+          const SizedBox(height: 10),
           Container(
-            Padding: const EdgeInsets.all(10),
-            Decoration: BoxDecoration(color: const Color(0xFF111111), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white12)),
-            Child: Text(_lastEncounterResult, style: const TextStyle(fontSize: 12, height: 1.4)),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111111),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Text(
+              _lastEncounterResult,
+              style: const TextStyle(fontSize: 12, height: 1.4),
+            ),
           ),
         ],
       ),
@@ -961,7 +1005,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         ),
         const SizedBox(height: 8),
         _buildDiseaseCard(
-          'Гортанні пиявки (Throat Leeches)',
+          'Гортанні п\'явки (Throat Leeches)',
           'Пиття некип\'яченої води. Спасбрусок Con DC 12.',
           'Виснаження +1 рівень, неможливість говорити або чаклувати вербальні заклинання.',
         ),
@@ -973,7 +1017,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         ),
         const SizedBox(height: 8),
         _buildDiseaseCard(
-          'Лихорадка безумної обезьяны',
+          'Лихорадка божевільної мавпи (Mad Monkey Fever)',
           'Контакт з магічним туманом Mad Monkey Mist. Con DC 13.',
           'Божевілля на 1d6 годин, галюцинації.',
         ),
@@ -1053,7 +1097,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Слабкість / Слабость: ${god['flaw']}',
+                            'Слабкість: ${god['flaw']}',
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.redAccent,

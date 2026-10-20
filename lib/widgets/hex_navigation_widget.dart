@@ -2,187 +2,225 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 enum TravelPace { fast, normal, slow }
+
 enum WeatherType { clear, heavyRain, tropicalStorm, extremeHeat }
 
 class HexNavigationWidget extends StatefulWidget {
-  final Function(int rations, int water) OnResourceUpdate;
+  final Function(int rations, int water) onResourceUpdate;
 
-  Const HexNavigationWidget({
-    Super.key,
-    Required this.onResourceUpdate,
-  });
+  const HexNavigationWidget({super.key, required this.onResourceUpdate});
 
   @override
   State<HexNavigationWidget> createState() => _HexNavigationWidgetState();
 }
 
-Class _HexNavigationWidgetState extends State<HexNavigationWidget> {
-  Final Random _rng = Random();
+class _HexNavigationWidgetState extends State<HexNavigationWidget> {
+  final Random _rng = Random();
 
   // Налаштування навігації
   TravelPace _selectedPace = TravelPace.normal;
-  Int _survivalBonus = 5; // Модифікується користувачем (Wisdom + Survival)
-  Int _targetDc = 15; // Складність навігації (зазвичай 10 або 15 в джунглях)
-  
+  int _survivalBonus = 5;
+  int _targetDc = 15;
+
   // Поточний стан
-  Bool _isLost = false;
-  String _navigationLog = 'Оберіть параметри та здійсніть перевірку орієнтування.';
+  bool _isLost = false;
+  String _navigationLog =
+      'Оберіть параметри та здійсніть перевірку орієнтування.';
   WeatherType _currentWeather = WeatherType.clear;
 
-  Void _rollWeather() {
-    Int roll = _rng.nextInt(100) + 1;
+  void _rollWeather() {
+    int roll = _rng.nextInt(100) + 1;
     WeatherType newWeather;
 
-    If (roll <= 60) {
-      NewWeather = WeatherType.clear;
+    if (roll <= 60) {
+      newWeather = WeatherType.clear;
     } else if (roll <= 85) {
-      NewWeather = WeatherType.heavyRain;
+      newWeather = WeatherType.heavyRain;
     } else if (roll <= 95) {
-      NewWeather = WeatherType.extremeHeat;
+      newWeather = WeatherType.extremeHeat;
     } else {
-      NewWeather = WeatherType.tropicalStorm;
+      newWeather = WeatherType.tropicalStorm;
     }
 
-    SetState(() {
+    setState(() {
       _currentWeather = newWeather;
     });
   }
 
-  Void _performDailyNavigation() {
+  void _performDailyNavigation() {
     _rollWeather();
 
-    Int d20 = _rng.nextInt(20) + 1;
-    
-    // Модифікатор темпу
-    Int paceModifier = 0;
-    If (_selectedPace == TravelPace.fast) paceModifier = -5; // Помеха / штраф
-    If (_selectedPace == TravelPace.slow) paceModifier = 5;  // Преимущество / бонус
+    int d20 = _rng.nextInt(20) + 1;
 
-    Int totalRoll = d20 + _survivalBonus + paceModifier;
-    Bool success = totalRoll >= _targetDc;
+    int paceModifier = 0;
+    if (_selectedPace == TravelPace.fast) paceModifier = -5;
+    if (_selectedPace == TravelPace.slow) paceModifier = 5;
 
-    Int waterCost = 2; // Базове споживання води на день
-    Int rationCost = 1; // Базове споживання їжі
+    int totalRoll = d20 + _survivalBonus + paceModifier;
+    bool success = totalRoll >= _targetDc;
 
-    If (_currentWeather == WeatherType.extremeHeat) {
-      WaterCost = 4; // При сильній спеці подвійне споживання води[cite: 8]
+    int waterCost = 2;
+    int rationCost = 1;
+
+    if (_currentWeather == WeatherType.extremeHeat) {
+      waterCost = 4;
     }
 
-    SetState(() {
+    setState(() {
       _isLost = !success;
-      
-      String paceText = _selectedPace == TravelPace.fast 
-          ? 'Швидкий (Штраф -5)' 
-          : (_selectedPace == TravelPace.slow ? 'Повільний (Бонус +5)' : 'Звичайний');
 
       String weatherText = _getWeatherTitle(_currentWeather);
 
-      _navigationLog = '''
-🎲 Кидок Навігації: $d20 + $_survivalBonus (модифікував темп: $paceModifier) = $totalRoll (Складність DC $_targetDc)
+      _navigationLog =
+          '''
+🎲 Кидок Навігації: $d20 + $_survivalBonus (модифікатор темпу: $paceModifier) = $totalRoll (Складність DC $_targetDc)
 Результат: ${success ? 'УСПІХ! Загін тримає курс.' : 'ПРОВАЛ! Загін заблукав у гексі.'}
 
 🌤 Погода: $weatherText
-💧 Споживання ресурсів за день: -$waterCost гал. Води, -$rationCost раціон.
+💧 Споживання ресурсів за день: -$waterCost гал. води, -$rationCost раціон.
 ''';
     });
 
-    Widget.onResourceUpdate(rationCost, waterCost);
+    widget.onResourceUpdate(rationCost, waterCost);
   }
 
   String _getWeatherTitle(WeatherType weather) {
-    Switch (weather) {
-      Case WeatherType.clear:
-        Return 'Спекотно та сонячно (Звичайна погода)';
-      Case WeatherType.heavyRain:
-        Return 'Тропічна злива (Знижена видимість)';
-      Case WeatherType.extremeHeat:
-        Return 'Аномальна спека (Подвійне споживання води!)';
-      Case WeatherType.tropicalStorm:
-        Return 'Тропічний шторм (Пересування ускладнене)';
+    switch (weather) {
+      case WeatherType.clear:
+        return 'Спекотно та сонячно (Звичайна погода)';
+      case WeatherType.heavyRain:
+        return 'Тропічна злива (Знижена видимість)';
+      case WeatherType.extremeHeat:
+        return 'Аномальна спека (Подвійне споживання води!)';
+      case WeatherType.tropicalStorm:
+        return 'Тропічний шторм (Пересування ускладнене)';
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    Return Card(
-      Color: const Color(0xFF252525),
-      Margin: const EdgeInsets.all(8.0),
-      Child: Padding(
-        Padding: const EdgeInsets.all(12.0),
-        Child: Column(
-          CrossAxisAlignment: CrossAxisAlignment.start,
-          Children: [
+    return Card(
+      color: const Color(0xFF252525),
+      margin: const EdgeInsets.all(8.0),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
-              Children: [
-                Const Icon(Icons.compass_calibration, color: Colors.amber),
-                Const SizedBox(width: 8),
-                Text(
+              children: [
+                const Icon(Icons.compass_calibration, color: Colors.amber),
+                const SizedBox(width: 8),
+                const Text(
                   'Навігатор Джунглів',
-                  Style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                Const Spacer(),
-                Container(
-                  Padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  Decoration: BoxDecoration(
-                    Color: _isLost ? Colors.red.withOpacity(0.3) : Colors.green.withOpacity(0.3),
-                    BorderRadius: BorderRadius.circular(4),
-                    Border: Border.all(color: _isLost ? Colors.red : Colors.green),
+                  style: TextStyle(
+                    color: Colors.amber,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
-                  Child: Text(
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _isLost
+                        ? Colors.red.withOpacity(0.3)
+                        : Colors.green.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _isLost ? Colors.red : Colors.green,
+                    ),
+                  ),
+                  child: Text(
                     _isLost ? 'СТАТУС: ЗАБЛУКАЛИ' : 'СТАТУС: КУРС ВІРНИЙ',
-                    Style: TextStyle(
-                      Color: _isLost ? Colors.redAccent : Colors.greenAccent,
-                      FontWeight: FontWeight.bold,
-                      FontSize: 11,
+                    style: TextStyle(
+                      color: _isLost ? Colors.redAccent : Colors.greenAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
                     ),
                   ),
                 ),
               ],
             ),
-            Const Divider(color: Colors.white24, height: 20),
-            
-            // Налаштування
+            const Divider(color: Colors.white24, height: 20),
+
             Row(
-              Children: [
+              children: [
                 Expanded(
-                  Child: Column(
-                    CrossAxisAlignment: CrossAxisAlignment.start,
-                    Children: [
-                      Const Text('Бонус Навігатора (Survival):', style: TextStyle(fontSize: 11, color: Colors.white70)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Бонус Навігатора (Survival):',
+                        style: TextStyle(fontSize: 11, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 4),
                       SizedBox(
-                        Height: 35,
-                        Child: TextField(
-                          Decoration: InputDecoration(
-                            Filled: true,
-                            FillColor: const Color(0xFF1A1A1A),
-                            Border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                            ContentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                        height: 38,
+                        child: TextField(
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: const Color(0xFF1A1A1A),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                            ),
                           ),
-                          KeyboardType: TextInputType.number,
-                          Controller: TextEditingController(text: '$_survivalBonus'),
-                          OnChanged: (val) => _survivalBonus = int.tryParse(val) ?? 0,
+                          keyboardType: TextInputType.number,
+                          controller: TextEditingController(
+                            text: '$_survivalBonus',
+                          ),
+                          onChanged: (val) =>
+                              _survivalBonus = int.tryParse(val) ?? 0,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Const SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
-                  Child: Column(
-                    CrossAxisAlignment: CrossAxisAlignment.start,
-                    Children: [
-                      Const Text('Складність (DC):', style: TextStyle(fontSize: 11, color: Colors.white70)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Складність (DC):',
+                        style: TextStyle(fontSize: 11, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 4),
                       DropdownButton<int>(
-                        Value: _targetDc,
-                        IsExpanded: true,
-                        DropdownColor: const Color(0xFF2A2A2A),
-                        Items: const [
-                          DropdownMenuItem(value: 10, child: Text('DC 10 (Річка / Стежка)')),
-                          DropdownMenuItem(value: 15, child: Text('DC 15 (Дикі джунглі)')),
-                          DropdownMenuItem(value: 20, child: Text('DC 20 (Болота / Туман)')),
+                        value: _targetDc,
+                        isExpanded: true,
+                        dropdownColor: const Color(0xFF2A2A2A),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 10,
+                            child: Text(
+                              'DC 10 (Річка / Стежка)',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 15,
+                            child: Text(
+                              'DC 15 (Дикі джунглі)',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 20,
+                            child: Text(
+                              'DC 20 (Болота / Туман)',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
                         ],
-                        OnChanged: (val) {
-                          If (val != null) setState(() => _targetDc = val);
+                        onChanged: (val) {
+                          if (val != null) setState(() => _targetDc = val);
                         },
                       ),
                     ],
@@ -190,50 +228,62 @@ Class _HexNavigationWidgetState extends State<HexNavigationWidget> {
                 ),
               ],
             ),
-            Const SizedBox(height: 8),
-            
-            // Темп руху
-            Const Text('Темп пересування:', style: TextStyle(fontSize: 11, color: Colors.white70)),
+            const SizedBox(height: 8),
+
+            const Text(
+              'Темп пересування:',
+              style: TextStyle(fontSize: 11, color: Colors.white70),
+            ),
+            const SizedBox(height: 4),
             Row(
-              MainAxisAlignment: MainAxisAlignment.spaceAround,
-              Children: TravelPace.values.map((pace) {
-                String label = pace == TravelPace.fast ? 'Швидкий' : (pace == TravelPace.slow ? 'Повільний' : 'Звичайний');
-                Return ChoiceChip(
-                  Label: Text(label, style: const TextStyle(fontSize: 11)),
-                  Selected: _selectedPace == pace,
-                  SelectedColor: Colors.amber,
-                  LabelStyle: TextStyle(color: _selectedPace == pace ? Colors.black : Colors.white),
-                  OnSelected: (sel) {
-                    If (sel) setState(() => _selectedPace = pace);
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: TravelPace.values.map((pace) {
+                String label = pace == TravelPace.fast
+                    ? 'Швидкий'
+                    : (pace == TravelPace.slow ? 'Повільний' : 'Звичайний');
+                return ChoiceChip(
+                  label: Text(label, style: const TextStyle(fontSize: 11)),
+                  selected: _selectedPace == pace,
+                  selectedColor: Colors.amber,
+                  labelStyle: TextStyle(
+                    color: _selectedPace == pace ? Colors.black : Colors.white,
+                  ),
+                  onSelected: (sel) {
+                    if (sel) setState(() => _selectedPace = pace);
                   },
                 );
               }).toList(),
             ),
-            Const SizedBox(height: 12),
-            
+            const SizedBox(height: 12),
+
             ElevatedButton.icon(
-              Style: ElevatedButton.styleFrom(
-                BackgroundColor: Colors.amber.shade700,
-                MinimumSize: const Size.fromHeight(38),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade700,
+                minimumSize: const Size.fromHeight(38),
               ),
-              Icon: const Icon(Icons.explore, color: Colors.black, size: 18),
-              Label: const Text('Розрахувати навігацію та погоду', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-              OnPressed: _performDailyNavigation,
+              icon: const Icon(Icons.explore, color: Colors.black, size: 18),
+              label: const Text(
+                'Розрахувати навігацію та погоду',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onPressed: _performDailyNavigation,
             ),
-            Const SizedBox(height: 10),
-            
-            // Лог
+            const SizedBox(height: 10),
+
             Container(
-              Width: double.infinity,
-              Padding: const EdgeInsets.all(8),
-              Decoration: BoxDecoration(
-                Color: const Color(0xFF151515),
-                BorderRadius: BorderRadius.circular(6),
-                Border: Border.all(color: Colors.white12),
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF151515),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.white12),
               ),
-              Child: Text(
+              child: Text(
                 _navigationLog,
-                Style: const TextStyle(fontSize: 11, height: 1.3),
+                style: const TextStyle(fontSize: 11, height: 1.3),
               ),
             ),
           ],
