@@ -25,6 +25,22 @@ class ToaDMCompanionApp extends StatelessWidget {
   }
 }
 
+class Combatant {
+  String name;
+  int initiative;
+  int currentHp;
+  int maxHp;
+  bool isMonster;
+
+  Combatant({
+    required this.name,
+    required this.initiative,
+    required this.currentHp,
+    required this.maxHp,
+    this.isMonster = false,
+  });
+}
+
 class MainDMDesktopScreen extends StatefulWidget {
   const MainDMDesktopScreen({super.key});
 
@@ -52,14 +68,16 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
   int _rationsLeft = 20;
   int _waterGallonsLeft = 30;
 
-  // Прокляття та Боги Ому
+  // Прокляття, Боги Ому та Бій
   List<dynamic> _tricksterGods = [];
+  List<Combatant> _combatants = [];
+  int _activeCombatantIndex = 0;
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadLocations();
     _loadEncounters();
     _loadTricksterGods();
@@ -191,6 +209,20 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                               subtitle: Text(
                                 '${m['type']} • CR: ${m['cr']} • КД: ${m['ac']} • ХП: ${m['hp']}',
                               ),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.add_swords,
+                                  color: Colors.redAccent,
+                                ),
+                                tooltip: 'Додати в трекер бою',
+                                onPressed: () {
+                                  _addMonsterToCombat(m);
+                                  Navigator.of(context).pop();
+                                  _tabController.animateTo(
+                                    3,
+                                  ); // Перехід на вкладку Бій
+                                },
+                              ),
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.all(12.0),
@@ -266,6 +298,90 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         );
       },
     );
+  }
+
+  void _addMonsterToCombat(dynamic monster) {
+    final rollInit = (1 + (DateTime.now().microsecondsSinceEpoch % 20));
+    final hp = monster['hp'] is int
+        ? monster['hp'] as int
+        : int.tryParse(monster['hp'].toString()) ?? 30;
+    setState(() {
+      _combatants.add(
+        Combatant(
+          name: '${monster['name']} #${_combatants.length + 1}',
+          initiative: rollInit,
+          currentHp: hp,
+          maxHp: hp,
+          isMonster: true,
+        ),
+      );
+      _sortCombatants();
+    });
+  }
+
+  void _addCustomCombatantDialog() {
+    String name = '';
+    int init = 10;
+    int hp = 20;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF222222),
+        title: const Text(
+          'Додати учасника бою',
+          style: TextStyle(color: Colors.amber),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              decoration: const InputDecoration(labelText: 'Ім\'я / Персонаж'),
+              onChanged: (v) => name = v,
+            ),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Ініціатива'),
+              keyboardType: TextInputType.number,
+              onChanged: (v) => init = int.tryParse(v) ?? 10,
+            ),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Максимальне HP'),
+              keyboardType: TextInputType.number,
+              onChanged: (v) => hp = int.tryParse(v) ?? 20,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Скасувати'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          ElevatedButton(
+            child: const Text('Додати'),
+            onPressed: () {
+              if (name.isNotEmpty) {
+                setState(() {
+                  _combatants.add(
+                    Combatant(
+                      name: name,
+                      initiative: init,
+                      currentHp: hp,
+                      maxHp: hp,
+                    ),
+                  );
+                  _sortCombatants();
+                });
+              }
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sortCombatants() {
+    _combatants.sort((a, b) => b.initiative.compareTo(a.initiative));
   }
 
   void _rollDailyEncounter() {
@@ -497,9 +613,9 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
           ),
           const VerticalDivider(width: 1, color: Colors.white12),
 
-          // Панель 3: Інструменти DM з Вкладками
+          // Панель 3: Інструменти DM з 4 Вкладками
           Container(
-            width: 340,
+            width: 360,
             color: const Color(0xFF1A1A1A),
             child: Column(
               children: [
@@ -509,9 +625,10 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                   labelColor: Colors.amber,
                   unselectedLabelColor: Colors.white60,
                   tabs: const [
-                    Tab(icon: Icon(Icons.explore, size: 18), text: 'Подорож'),
-                    Tab(icon: Icon(Icons.warning, size: 18), text: 'Прокляття'),
-                    Tab(icon: Icon(Icons.auto_awesome, size: 18), text: 'Боги'),
+                    Tab(icon: Icon(Icons.explore, size: 16), text: 'Подорож'),
+                    Tab(icon: Icon(Icons.warning, size: 16), text: 'Прокляття'),
+                    Tab(icon: Icon(Icons.auto_awesome, size: 16), text: 'Боги'),
+                    Tab(icon: Icon(Icons.shield, size: 16), text: 'Бій'),
                   ],
                 ),
                 Expanded(
@@ -521,6 +638,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                       _buildTravelTab(),
                       _buildCurseTab(),
                       _buildGodsTab(),
+                      _buildCombatTab(),
                     ],
                   ),
                 ),
@@ -809,5 +927,190 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
               );
             },
           );
+  }
+
+  // Віджет Вкладки 4: Бій (Combat Tracker)
+  Widget _buildCombatTab() {
+    return Padding(
+      padding: const EdgeInsets.all(10.0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber.shade700,
+                  ),
+                  icon: const Icon(
+                    Icons.person_add,
+                    size: 16,
+                    color: Colors.black,
+                  ),
+                  label: const Text(
+                    'Учасник',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onPressed: _addCustomCombatantDialog,
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.clear_all, color: Colors.redAccent),
+                tooltip: 'Очистити бій',
+                onPressed: () => setState(() => _combatants.clear()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _combatants.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Бій не розпочато.\nДодайте монстра з бестіарію або гравця.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white54),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _combatants.length,
+                    itemBuilder: (context, index) {
+                      final c = _combatants[index];
+                      final isCurrentTurn = _activeCombatantIndex == index;
+
+                      return Card(
+                        color: isCurrentTurn
+                            ? Colors.amber.withOpacity(0.15)
+                            : const Color(0xFF252525),
+                        shape: isCurrentTurn
+                            ? RoundedRectangleBorder(
+                                side: const BorderSide(
+                                  color: Colors.amber,
+                                  width: 1.5,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              )
+                            : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8.0,
+                            vertical: 6.0,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.amber,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '${c.initiative}',
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      c.name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: c.isMonster
+                                            ? Colors.redAccent
+                                            : Colors.lightBlueAccent,
+                                      ),
+                                    ),
+                                    Text(
+                                      'HP: ${c.currentHp} / ${c.maxHp}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.remove,
+                                  size: 16,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => setState(
+                                  () => c.currentHp = (c.currentHp - 5).clamp(
+                                    0,
+                                    c.maxHp,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.add,
+                                  size: 16,
+                                  color: Colors.green,
+                                ),
+                                onPressed: () => setState(
+                                  () => c.currentHp = (c.currentHp + 5).clamp(
+                                    0,
+                                    c.maxHp,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  size: 16,
+                                  color: Colors.white30,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _combatants.removeAt(index)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          if (_combatants.isNotEmpty) ...[
+            const Divider(color: Colors.white24),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade700,
+                minimumSize: const Size.fromHeight(36),
+              ),
+              icon: const Icon(Icons.skip_next, color: Colors.black, size: 18),
+              label: const Text(
+                'Наступний хід',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onPressed: () {
+                setState(() {
+                  _activeCombatantIndex =
+                      (_activeCombatantIndex + 1) % _combatants.length;
+                });
+              },
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
