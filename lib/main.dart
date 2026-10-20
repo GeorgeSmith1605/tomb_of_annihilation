@@ -33,15 +33,26 @@ class MainDMDesktopScreen extends StatefulWidget {
 }
 
 class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
+  // Список локацій та стан карти
   List<dynamic> _locations = [];
   dynamic _selectedLocation;
   String _searchQuery = '';
   int _currentDay = 1;
   bool _showMap = false;
+
+  // Подорож та зустрічі
+  Map<String, dynamic> _encounterTables = {};
+  String _selectedBiome = 'jungle_normal';
+  String _lastEncounterResult =
+      'Натисніть "Провести день" або "Кидок зустрічі"';
+  int _rationsLeft = 20;
+  int _waterGallonsLeft = 30;
+
   @override
   void initState() {
     super.initState();
     _loadLocations();
+    _loadEncounters();
   }
 
   Future<void> _loadLocations() async {
@@ -59,6 +70,54 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
     } catch (e) {
       debugPrint("Error loading locations: $e");
     }
+  }
+
+  Future<void> _loadEncounters() async {
+    try {
+      final String response = await rootBundle.loadString(
+        'assets/data/encounters.json',
+      );
+      final data = await json.decode(response);
+      setState(() {
+        _encounterTables = data;
+      });
+    } catch (e) {
+      debugPrint("Error loading encounters: $e");
+    }
+  }
+
+  void _rollDailyEncounter() {
+    final roll = 1 + (DateTime.now().microsecondsSinceEpoch % 20);
+    final table = _encounterTables[_selectedBiome] as List<dynamic>?;
+
+    if (table == null) return;
+
+    dynamic found;
+    for (var enc in table) {
+      if (roll >= enc['range'][0] && roll <= enc['range'][1]) {
+        found = enc;
+        break;
+      }
+    }
+
+    setState(() {
+      if (found != null) {
+        _lastEncounterResult =
+            '[$roll по d20] ${found['name']}\n\n${found['description']}\n(Загроза: ${found['threat']})';
+      } else {
+        _lastEncounterResult =
+            '[$roll по d20] Спокійний день. Нічого не сталося.';
+      }
+    });
+  }
+
+  void _advanceDay() {
+    setState(() {
+      _currentDay++;
+      if (_rationsLeft > 0) _rationsLeft -= 1;
+      if (_waterGallonsLeft > 0) _waterGallonsLeft -= 2;
+    });
+    _rollDailyEncounter();
   }
 
   @override
@@ -166,7 +225,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
           ),
           const VerticalDivider(width: 1, color: Colors.white12),
 
-          // Панель 2: Детальний вміст обраної локації
+          // Панель 2: Детальний вміст обраної локації або Карта
           Expanded(
             flex: 3,
             child: _showMap
@@ -251,9 +310,9 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
           ),
           const VerticalDivider(width: 1, color: Colors.white12),
 
-          // Панель 3: Інструменти Майстра (Дайс-ролер та події)
+          // Панель 3: Інструменти DM та трекер подорожі
           Container(
-            width: 300,
+            width: 320,
             color: const Color(0xFF1A1A1A),
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -267,49 +326,130 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
                     color: Colors.amber,
                   ),
                 ),
+                const SizedBox(height: 12),
+
+                // Трекер ресурсів
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF282828),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Харчі (Раціони):'),
+                          Text(
+                            '$_rationsLeft дн.',
+                            style: TextStyle(
+                              color: _rationsLeft < 5
+                                  ? Colors.red
+                                  : Colors.green,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Вода (Галони):'),
+                          Text(
+                            '$_waterGallonsLeft гал.',
+                            style: TextStyle(
+                              color: _waterGallonsLeft < 10
+                                  ? Colors.red
+                                  : Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
+
+                // Вибір біому
+                const Text(
+                  'Поточний біом / зона:',
+                  style: TextStyle(fontSize: 13, color: Colors.white70),
+                ),
+                DropdownButton<String>(
+                  value: _selectedBiome,
+                  isExpanded: true,
+                  dropdownColor: const Color(0xFF2A2A2A),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'jungle_normal',
+                      child: Text('Джунглі (Нормальна загроза)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'undead_high',
+                      child: Text('Зона високої нежиті'),
+                    ),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedBiome = val);
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // Кнопки дій
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.amber.shade700,
                     minimumSize: const Size.fromHeight(40),
                   ),
-                  icon: const Icon(Icons.casino, color: Colors.black),
+                  icon: const Icon(Icons.arrow_forward, color: Colors.black),
                   label: const Text(
-                    'Випадкова зустріч (d20)',
+                    'Провести день (+1 день)',
                     style: TextStyle(
                       color: Colors.black,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  onPressed: () {
-                    final roll =
-                        (1 + (DateTime.now().microsecondsSinceEpoch % 20));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Кидок: $roll ${roll >= 16 ? "— Сталася зустріч!" : "— Тихий день."}',
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: _advanceDay,
                 ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueGrey,
-                    minimumSize: const Size.fromHeight(40),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(36),
                   ),
-                  icon: const Icon(Icons.wb_sunny_outlined),
-                  label: const Text('Перевірка погоди'),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Погода: Тропічна злива (Знижена видимість)',
-                        ),
+                  icon: const Icon(Icons.casino, size: 18),
+                  label: const Text('Кидок зустрічі (d20)'),
+                  onPressed: _rollDailyEncounter,
+                ),
+                const SizedBox(height: 16),
+
+                // Вікно результату зустрічі
+                const Text(
+                  'Результат події:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111111),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: SingleChildScrollView(
+                      child: Text(
+                        _lastEncounterResult,
+                        style: const TextStyle(fontSize: 13, height: 1.4),
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ],
             ),
