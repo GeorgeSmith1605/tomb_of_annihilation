@@ -24,4 +24,5 @@ flutter:
     - assets/data/trickster_gods.json
     - assets/data/monsters.json
     - assets/data/rumors.json
+    - assets/data/puzzles.json
     - assets/images/
