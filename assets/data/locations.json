@@ -6,6 +6,8 @@
     "region": "River Soshenstar",
     "summary": "Заброшенный лагерь Ордена Перчатки возле Дома Крокодила.",
     "dangerLevel": "Medium",
+    "x": 0.45,
+    "y": 0.38,
     "tags": [
       "Order of the Gauntlet",
       "Undead",
@@ -24,6 +26,8 @@
     "region": "River Soshenstar",
     "summary": "Укрепленный форт Ордена Перчатки под командованием Найлса Костолома.",
     "dangerLevel": "High",
+    "x": 0.42,
+    "y": 0.48,
     "tags": [
       "Order of the Gauntlet",
       "NPC",
@@ -33,39 +37,6 @@
       "Защитный ров с кольями и палисад",
       "Командир Найлс Костолом (Niles Bonebreaker)",
       "Проблемы с нежитью, болезнями и снабжением"
-    ]
-  },
-  {
-    "id": "ataaz_kahakla",
-    "name": "Ataaz Kahakla (Ущелье Смерти)",
-    "category": "Canyon / Landmark",
-    "region": "Jungles of Chult",
-    "summary": "Живописный каньон с древними кораллами и окаменелостями.",
-    "dangerLevel": "Medium",
-    "tags": [
-      "Canyon",
-      "Exploration"
-    ],
-    "keyFeatures": [
-      "Стены высотой от 50 до 200 футов",
-      "Скелеты древних морских существ"
-    ]
-  },
-  {
-    "id": "dungrunglung",
-    "name": "Dungrunglung (Дунгрунгланг)",
-    "category": "Settlement",
-    "region": "Jungles of Chult",
-    "summary": "Анклав грингли (grung), окруженный терновым лабиринтом.",
-    "dangerLevel": "Medium",
-    "tags": [
-      "Grung",
-      "King Groak",
-      "Maze"
-    ],
-    "keyFeatures": [
-      "20-футовый магический терновый лабиринт",
-      "Тюремная яма и Великий Ритуал Нангнанг"
     ]
   }
 ]

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'widgets/chult_map_widget.dart';
 
 void main() {
   runApp(const ToaDMCompanionApp());
@@ -36,7 +37,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
   dynamic _selectedLocation;
   String _searchQuery = '';
   int _currentDay = 1;
-
+  bool _showMap = false;
   @override
   void initState() {
     super.initState();
@@ -74,6 +75,14 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
         title: const Text('ToA DM Companion — Desktop Workspace'),
         backgroundColor: const Color(0xFF111111),
         actions: [
+          IconButton(
+            icon: Icon(
+              _showMap ? Icons.article : Icons.map,
+              color: Colors.amber,
+            ),
+            tooltip: _showMap ? 'Перейти до опису' : 'Відкрити карту',
+            onPressed: () => setState(() => _showMap = !_showMap),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
@@ -160,67 +169,85 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
           // Панель 2: Детальний вміст обраної локації
           Expanded(
             flex: 3,
-            child: _selectedLocation == null
-                ? const Center(child: Text('Оберіть локацію для перегляду'))
-                : Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: ListView(
-                      children: [
-                        Text(
-                          _selectedLocation['name'],
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(color: Colors.amber),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Chip(label: Text(_selectedLocation['category'])),
-                            const SizedBox(width: 8),
-                            Chip(
-                              label: Text(
-                                'Рівень загрози: ${_selectedLocation['dangerLevel']}',
+            child: _showMap
+                ? ChultMapWidget(
+                    locations: _locations,
+                    selectedLocation: _selectedLocation,
+                    onSelectLocation: (loc) =>
+                        setState(() => _selectedLocation = loc),
+                  )
+                : (_selectedLocation == null
+                      ? const Center(
+                          child: Text('Оберіть локацію для перегляду'),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: ListView(
+                            children: [
+                              Text(
+                                _selectedLocation['name'],
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(color: Colors.amber),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _selectedLocation['summary'],
-                          style: const TextStyle(fontSize: 16, height: 1.4),
-                        ),
-                        const Divider(height: 32, color: Colors.white24),
-                        const Text(
-                          'Ключові особливості:',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ...(_selectedLocation['keyFeatures'] as List).map(
-                          (feature) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4.0),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.label_important,
-                                  size: 16,
-                                  color: Colors.amber,
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Chip(
+                                    label: Text(_selectedLocation['category']),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Chip(
+                                    label: Text(
+                                      'Рівень загрози: ${_selectedLocation['dangerLevel']}',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _selectedLocation['summary'],
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  height: 1.4,
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    feature,
-                                    style: const TextStyle(fontSize: 15),
+                              ),
+                              const Divider(height: 32, color: Colors.white24),
+                              const Text(
+                                'Ключові особливості:',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...(_selectedLocation['keyFeatures'] as List).map(
+                                (feature) => Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4.0,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.label_important,
+                                        size: 16,
+                                        color: Colors.amber,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          feature,
+                                          style: const TextStyle(fontSize: 15),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                        )),
           ),
           const VerticalDivider(width: 1, color: Colors.white12),
 
