@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'widgets/chult_map_widget.dart';
+import 'widgets/hex_navigation_widget.dart';
 
 void main() {
   runApp(const ToaDMCompanionApp());
@@ -826,123 +827,84 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
   }
 
   Widget _buildTravelTab() {
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    Return Padding(
+      Padding: const EdgeInsets.all(12.0),
+      Child: ListView(
+        Children: [
+          // Блок ресурсів
           Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF282828),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              children: [
+            Padding: const EdgeInsets.all(10),
+            Decoration: BoxDecoration(color: const Color(0xFF282828), borderRadius: BorderRadius.circular(8)),
+            Child: Column(
+              Children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Харчі (Раціони):'),
-                    Text(
-                      '$_rationsLeft дн.',
-                      style: TextStyle(
-                        color: _rationsLeft < 5 ? Colors.red : Colors.green,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  MainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Children: [
+                    Const Text('Харчі (Раціони):'),
+                    Text('$_rationsLeft дн.', Style: TextStyle(color: _rationsLeft < 5 ? Colors.red : Colors.green, fontWeight: FontWeight.bold)),
                   ],
                 ),
-                const SizedBox(height: 6),
+                Const SizedBox(height: 6),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Вода (Галони):'),
-                    Text(
-                      '$_waterGallonsLeft гал.',
-                      style: TextStyle(
-                        color: _waterGallonsLeft < 10
-                            ? Colors.red
-                            : Colors.blue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  MainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Children: [
+                    Const Text('Вода (Галони):'),
+                    Text('$_waterGallonsLeft гал.', Style: TextStyle(color: _waterGallonsLeft < 10 ? Colors.red : Colors.blue, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Поточний біом:',
-            style: TextStyle(fontSize: 12, color: Colors.white70),
+          Const SizedBox(height: 12),
+
+          // Віджет Навігації та Погоди
+          HexNavigationWidget(
+            OnResourceUpdate: (rationCost, waterCost) {
+              SetState(() {
+                _rationsLeft = (_rationsLeft - rationCost).clamp(0, 999);
+                _waterGallonsLeft = (_waterGallonsLeft - waterCost).clamp(0, 999);
+              });
+              _saveCampaignState();
+            },
           ),
+          Const SizedBox(height: 12),
+
+          // Вибір біома та генератор зустрічей
+          Const Text('Поточний біом:', style: TextStyle(fontSize: 12, color: Colors.white70)),
           DropdownButton<String>(
-            value: _selectedBiome,
-            isExpanded: true,
-            dropdownColor: const Color(0xFF2A2A2A),
-            items: const [
-              DropdownMenuItem(
-                value: 'jungle_normal',
-                child: Text('Джунглі (Нормальна загроза)'),
-              ),
-              DropdownMenuItem(
-                value: 'undead_high',
-                child: Text('Зона високої нежиті'),
-              ),
+            Value: _selectedBiome,
+            IsExpanded: true,
+            DropdownColor: const Color(0xFF2A2A2A),
+            Items: const [
+              DropdownMenuItem(value: 'jungle_normal', child: Text('Джунглі (Нормальна загроза)')),
+              DropdownMenuItem(value: 'undead_high', child: Text('Зона високої нежиті')),
             ],
-            onChanged: (val) {
-              if (val != null) {
-                setState(() => _selectedBiome = val);
+            OnChanged: (val) {
+              If (val != null) {
+                SetState(() => _selectedBiome = val);
                 _saveCampaignState();
               }
             },
           ),
-          const SizedBox(height: 8),
+          Const SizedBox(height: 8),
           ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber.shade700,
-              minimumSize: const Size.fromHeight(38),
-            ),
-            icon: const Icon(
-              Icons.arrow_forward,
-              color: Colors.black,
-              size: 18,
-            ),
-            label: const Text(
-              'Провести день (+1 день)',
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            onPressed: _advanceDay,
+            Style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade700, minimumSize: const Size.fromHeight(38)),
+            Icon: const Icon(Icons.arrow_forward, color: Colors.black, size: 18),
+            Label: const Text('Провести день (+1 день)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            OnPressed: _advanceDay,
           ),
-          const SizedBox(height: 6),
+          Const SizedBox(height: 6),
           OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(34),
-            ),
-            icon: const Icon(Icons.casino, size: 16),
-            label: const Text('Кидок зустрічі (d20)'),
-            onPressed: _rollDailyEncounter,
+            Style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(34)),
+            Icon: const Icon(Icons.casino, size: 16),
+            Label: const Text('Кидок зустрічі (d20)'),
+            OnPressed: _rollDailyEncounter,
           ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111111),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: SingleChildScrollView(
-                child: Text(
-                  _lastEncounterResult,
-                  style: const TextStyle(fontSize: 12, height: 1.4),
-                ),
-              ),
-            ),
+          Const SizedBox(height: 10),
+          Container(
+            Padding: const EdgeInsets.all(10),
+            Decoration: BoxDecoration(color: const Color(0xFF111111), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white12)),
+            Child: Text(_lastEncounterResult, style: const TextStyle(fontSize: 12, height: 1.4)),
           ),
         ],
       ),
