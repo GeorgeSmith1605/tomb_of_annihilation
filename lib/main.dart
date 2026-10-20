@@ -32,8 +32,9 @@ class MainDMDesktopScreen extends StatefulWidget {
   State<MainDMDesktopScreen> createState() => _MainDMDesktopScreenState();
 }
 
-class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
-  // Список локацій та стан карти
+class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
+    with SingleTickerProviderStateMixin {
+  // Список локацій та стан карты
   List<dynamic> _locations = [];
   dynamic _selectedLocation;
   String _searchQuery = '';
@@ -48,11 +49,23 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
   int _rationsLeft = 20;
   int _waterGallonsLeft = 30;
 
+  // Прокляття та Боги Ому
+  List<dynamic> _tricksterGods = [];
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     _loadLocations();
     _loadEncounters();
+    _loadTricksterGods();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLocations() async {
@@ -83,6 +96,20 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
       });
     } catch (e) {
       debugPrint("Error loading encounters: $e");
+    }
+  }
+
+  Future<void> _loadTricksterGods() async {
+    try {
+      final String response = await rootBundle.loadString(
+        'assets/data/trickster_gods.json',
+      );
+      final data = await json.decode(response);
+      setState(() {
+        _tricksterGods = data;
+      });
+    } catch (e) {
+      debugPrint("Error loading trickster gods: $e");
     }
   }
 
@@ -167,7 +194,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
       ),
       body: Row(
         children: [
-          // Панель 1: Навігація та пошук по локаціях
+          // Панель 1: Навігація
           Container(
             width: 320,
             color: const Color(0xFF242424),
@@ -225,7 +252,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
           ),
           const VerticalDivider(width: 1, color: Colors.white12),
 
-          // Панель 2: Детальний вміст обраної локації або Карта
+          // Панель 2: Зміст локації або Карта
           Expanded(
             flex: 3,
             child: _showMap
@@ -310,145 +337,34 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
           ),
           const VerticalDivider(width: 1, color: Colors.white12),
 
-          // Панель 3: Інструменти DM та трекер подорожі
+          // Панель 3: Інструменти DM з Вкладками
           Container(
-            width: 320,
+            width: 340,
             color: const Color(0xFF1A1A1A),
-            padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Інструменти DM',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amber,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Трекер ресурсів
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF282828),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Харчі (Раціони):'),
-                          Text(
-                            '$_rationsLeft дн.',
-                            style: TextStyle(
-                              color: _rationsLeft < 5
-                                  ? Colors.red
-                                  : Colors.green,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Вода (Галони):'),
-                          Text(
-                            '$_waterGallonsLeft гал.',
-                            style: TextStyle(
-                              color: _waterGallonsLeft < 10
-                                  ? Colors.red
-                                  : Colors.blue,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Вибір біому
-                const Text(
-                  'Поточний біом / зона:',
-                  style: TextStyle(fontSize: 13, color: Colors.white70),
-                ),
-                DropdownButton<String>(
-                  value: _selectedBiome,
-                  isExpanded: true,
-                  dropdownColor: const Color(0xFF2A2A2A),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'jungle_normal',
-                      child: Text('Джунглі (Нормальна загроза)'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'undead_high',
-                      child: Text('Зона високої нежиті'),
-                    ),
+                TabBar(
+                  controller: _tabController,
+                  indicatorColor: Colors.amber,
+                  labelColor: Colors.amber,
+                  unselectedLabelColor: Colors.white60,
+                  tabs: const [
+                    Tab(icon: Icon(Icons.explore, size: 18), text: 'Подорож'),
+                    Tab(icon: Icon(Icons.warning, size: 18), text: 'Прокляття'),
+                    Tab(icon: Icon(Icons.auto_awesome, size: 18), text: 'Боги'),
                   ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedBiome = val);
-                  },
                 ),
-                const SizedBox(height: 12),
-
-                // Кнопки дій
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber.shade700,
-                    minimumSize: const Size.fromHeight(40),
-                  ),
-                  icon: const Icon(Icons.arrow_forward, color: Colors.black),
-                  label: const Text(
-                    'Провести день (+1 день)',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  onPressed: _advanceDay,
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(36),
-                  ),
-                  icon: const Icon(Icons.casino, size: 18),
-                  label: const Text('Кидок зустрічі (d20)'),
-                  onPressed: _rollDailyEncounter,
-                ),
-                const SizedBox(height: 16),
-
-                // Вікно результату зустрічі
-                const Text(
-                  'Результат події:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amber,
-                  ),
-                ),
-                const SizedBox(height: 6),
                 Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF111111),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: SingleChildScrollView(
-                      child: Text(
-                        _lastEncounterResult,
-                        style: const TextStyle(fontSize: 13, height: 1.4),
-                      ),
-                    ),
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      // Вкладка 1: Подорож
+                      _buildTravelTab(),
+                      // Вкладка 2: Прокляття та Хвороби
+                      _buildCurseTab(),
+                      // Вкладка 3: Боги Ому
+                      _buildGodsTab(),
+                    ],
                   ),
                 ),
               ],
@@ -457,5 +373,287 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen> {
         ],
       ),
     );
+  }
+
+  // Віджет Вкладки 1: Подорож
+  Widget _buildTravelTab() {
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF282828),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Харчі (Раціони):'),
+                    Text(
+                      '$_rationsLeft дн.',
+                      style: TextStyle(
+                        color: _rationsLeft < 5 ? Colors.red : Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Вода (Галони):'),
+                    Text(
+                      '$_waterGallonsLeft гал.',
+                      style: TextStyle(
+                        color: _waterGallonsLeft < 10
+                            ? Colors.red
+                            : Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Поточний біом:',
+            style: TextStyle(fontSize: 12, color: Colors.white70),
+          ),
+          DropdownButton<String>(
+            value: _selectedBiome,
+            isExpanded: true,
+            dropdownColor: const Color(0xFF2A2A2A),
+            items: const [
+              DropdownMenuItem(
+                value: 'jungle_normal',
+                child: Text('Джунглі (Нормальна загроза)'),
+              ),
+              DropdownMenuItem(
+                value: 'undead_high',
+                child: Text('Зона високої нежиті'),
+              ),
+            ],
+            onChanged: (val) {
+              if (val != null) setState(() => _selectedBiome = val);
+            },
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber.shade700,
+              minimumSize: const Size.fromHeight(38),
+            ),
+            icon: const Icon(
+              Icons.arrow_forward,
+              color: Colors.black,
+              size: 18,
+            ),
+            label: const Text(
+              'Провести день (+1 день)',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            onPressed: _advanceDay,
+          ),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(34),
+            ),
+            icon: const Icon(Icons.casino, size: 16),
+            label: const Text('Кидок зустрічі (d20)'),
+            onPressed: _rollDailyEncounter,
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: SingleChildScrollView(
+                child: Text(
+                  _lastEncounterResult,
+                  style: const TextStyle(fontSize: 12, height: 1.4),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Віджет Вкладки 2: Прокляття Смерті та Хвороби
+  Widget _buildCurseTab() {
+    final hpLostPerResurrected = _currentDay;
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        const Text(
+          'Прокляття Смерті (Death Curse)',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: Colors.redAccent,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Втрата Max HP для воскреслих: -$hpLostPerResurrected HP',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.redAccent,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Усі воскреслі істоти втрачають 1 Max HP щодня з початку прокляття.',
+                style: TextStyle(fontSize: 11, color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 24, color: Colors.white24),
+        const Text(
+          'Хвороби Чульта',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: Colors.amber,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildDiseaseCard(
+          'Гортанні пиявки (Throat Leeches)',
+          'Пиття некип\'яченої води. Спасбрусок Con DC 12.',
+          'Виснаження +1 рівень, неможливість говорити або чаклувати вербальні заклинання.',
+        ),
+        const SizedBox(height: 8),
+        _buildDiseaseCard(
+          'Дрожаща хвороба (Shivering Sickness)',
+          'Укуси комах (без репеленту). Спасбрусок Con DC 11.',
+          'Оздоб та лихоманка. Disadvantage на всі перевірки здібностей та атаки.',
+        ),
+        const SizedBox(height: 8),
+        _buildDiseaseCard(
+          'Лихорадка безумної обезьяны',
+          'Контакт з магічним туманом Mad Monkey Mist. Con DC 13.',
+          'Божевілля на 1d6 годин, галюцинації.',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDiseaseCard(String title, String trigger, String effect) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF262626),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.amber,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Тригер: $trigger',
+            style: const TextStyle(fontSize: 11, color: Colors.white70),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Ефект: $effect',
+            style: const TextStyle(fontSize: 11, color: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Віджет Вкладки 3: Боги Ому
+  Widget _buildGodsTab() {
+    return _tricksterGods.isEmpty
+        ? const Center(child: CircularProgressIndicator())
+        : ListView.builder(
+            padding: const EdgeInsets.all(10),
+            itemCount: _tricksterGods.length,
+            itemBuilder: (context, index) {
+              final god = _tricksterGods[index];
+              return Card(
+                color: const Color(0xFF252525),
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ExpansionTile(
+                  title: Text(
+                    god['name'],
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${god['animal']} • ${god['alignment']}',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Сила: ${god['power']}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.greenAccent,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Слабкість / Слабость: ${god['flaw']}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
   }
 }

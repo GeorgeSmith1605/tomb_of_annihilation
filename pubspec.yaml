@@ -55,6 +55,7 @@ flutter:
   assets:
     - assets/data/locations.json
     - assets/data/encounters.json
+    - assets/data/trickster_gods.json
     - assets/images/
 
   # The following line ensures that the Material Icons font is
