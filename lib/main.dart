@@ -61,6 +61,9 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
   List<dynamic> _monsters = [];
   List<dynamic> _rumors = [];
   List<dynamic> _puzzles = [];
+  List<dynamic> _guides = [];
+  dynamic _activeGuide;
+
   final Map<String, String> _locationNotes = {};
   final TextEditingController _notesController = TextEditingController();
 
@@ -70,6 +73,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       'Натисніть "Провести день" або "Кидок зустрічі"';
   int _rationsLeft = 20;
   int _waterGallonsLeft = 30;
+  int _partyGold = 150;
 
   List<dynamic> _tricksterGods = [];
   List<Combatant> _combatants = [];
@@ -86,6 +90,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     _loadMonsters();
     _loadRumors();
     _loadPuzzles();
+    _loadGuides();
     _loadCampaignState();
   }
 
@@ -101,12 +106,20 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     await prefs.setInt('currentDay', _currentDay);
     await prefs.setInt('rationsLeft', _rationsLeft);
     await prefs.setInt('waterGallonsLeft', _waterGallonsLeft);
+    await prefs.setInt('partyGold', _partyGold);
     await prefs.setString('selectedBiome', _selectedBiome);
     await prefs.setString('lastEncounter', _lastEncounterResult);
 
+    if (_activeGuide != null) {
+      await prefs.setString('activeGuideId', _activeGuide['id']);
+    } else {
+      await prefs.remove('activeGuideId');
+    }
+
     if (_selectedLocation != null) {
       _locationNotes[_selectedLocation['id']] = _notesController.text;
-      await prefs.setString('notes_${_selectedLocation['id']}', _notesController.text);
+      await prefs.setString(
+          'notes_${_selectedLocation['id']}', _notesController.text);
     }
   }
 
@@ -116,10 +129,18 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       _currentDay = prefs.getInt('currentDay') ?? 1;
       _rationsLeft = prefs.getInt('rationsLeft') ?? 20;
       _waterGallonsLeft = prefs.getInt('waterGallonsLeft') ?? 30;
+      _partyGold = prefs.getInt('partyGold') ?? 150;
       _selectedBiome = prefs.getString('selectedBiome') ?? 'jungle_normal';
-      _lastEncounterResult =
-          prefs.getString('lastEncounter') ??
+      _lastEncounterResult = prefs.getString('lastEncounter') ??
           'Натисніть "Провести день" або "Кидок зустрічі"';
+
+      final savedGuideId = prefs.getString('activeGuideId');
+      if (savedGuideId != null && _guides.isNotEmpty) {
+        _activeGuide = _guides.firstWhere(
+          (g) => g['id'] == savedGuideId,
+          orElse: () => null,
+        );
+      }
     });
   }
 
@@ -131,9 +152,23 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     });
   }
 
+  Future<void> _loadGuides() async {
+    try {
+      final String response =
+          await rootBundle.loadString('assets/data/guides.json');
+      final data = json.decode(response);
+      setState(() {
+        _guides = data;
+      });
+    } catch (e) {
+      debugPrint("Error loading guides: $e");
+    }
+  }
+
   Future<void> _loadPuzzles() async {
     try {
-      final String response = await rootBundle.loadString('assets/data/puzzles.json');
+      final String response =
+          await rootBundle.loadString('assets/data/puzzles.json');
       final data = json.decode(response);
       setState(() {
         _puzzles = data;
@@ -145,7 +180,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
 
   Future<void> _loadRumors() async {
     try {
-      final String response = await rootBundle.loadString('assets/data/rumors.json');
+      final String response =
+          await rootBundle.loadString('assets/data/rumors.json');
       final data = json.decode(response);
       setState(() {
         _rumors = data;
@@ -157,7 +193,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
 
   Future<void> _loadMonsters() async {
     try {
-      final String response = await rootBundle.loadString('assets/data/monsters.json');
+      final String response =
+          await rootBundle.loadString('assets/data/monsters.json');
       final data = json.decode(response);
       setState(() {
         _monsters = data;
@@ -169,7 +206,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
 
   Future<void> _loadLocations() async {
     try {
-      final String response = await rootBundle.loadString('assets/data/locations.json');
+      final String response =
+          await rootBundle.loadString('assets/data/locations.json');
       final data = json.decode(response);
       setState(() {
         _locations = data;
@@ -185,7 +223,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
 
   Future<void> _loadEncounters() async {
     try {
-      final String response = await rootBundle.loadString('assets/data/encounters.json');
+      final String response =
+          await rootBundle.loadString('assets/data/encounters.json');
       final data = json.decode(response);
       setState(() {
         _encounterTables = data;
@@ -197,7 +236,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
 
   Future<void> _loadTricksterGods() async {
     try {
-      final String response = await rootBundle.loadString('assets/data/trickster_gods.json');
+      final String response =
+          await rootBundle.loadString('assets/data/trickster_gods.json');
       final data = json.decode(response);
       setState(() {
         _tricksterGods = data;
@@ -205,6 +245,125 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     } catch (e) {
       debugPrint("Error loading trickster gods: $e");
     }
+  }
+
+  void _openGuidesDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF222222),
+              title: const Row(
+                children: [
+                  Icon(Icons.person_pin_circle, color: Colors.amber),
+                  SizedBox(width: 10),
+                  Text('Проводники Чульта (Port Nyanzaru Guides)',
+                      style: TextStyle(color: Colors.amber)),
+                ],
+              ),
+              content: SizedBox(
+                width: 680,
+                height: 520,
+                child: ListView.builder(
+                  itemCount: _guides.length,
+                  itemBuilder: (context, index) {
+                    final g = _guides[index];
+                    final isSelected =
+                        _activeGuide != null && _activeGuide['id'] == g['id'];
+
+                    return Card(
+                      color: isSelected
+                          ? Colors.amber.withOpacity(0.15)
+                          : const Color(0xFF2E2E2E),
+                      shape: isSelected
+                          ? RoundedRectangleBorder(
+                              side: const BorderSide(
+                                  color: Colors.amber, width: 1.5),
+                              borderRadius: BorderRadius.circular(8))
+                          : null,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ExpansionTile(
+                        title: Text(g['name'],
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber,
+                                fontSize: 15)),
+                        subtitle: Text(
+                            '${g['raceClass']} • Плата: ${g['costPerDay']} зм/день'),
+                        trailing: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isSelected
+                                ? Colors.green
+                                : Colors.amber.shade700,
+                          ),
+                          child: Text(
+                            isSelected ? 'Активний' : 'Найняти',
+                            style: const TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _activeGuide = isSelected ? null : g;
+                            });
+                            setModalState(() {});
+                            _saveCampaignState();
+                          },
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Оголошення / Раздатка:',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.amber)),
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                      color: const Color(0xFF181818),
+                                      borderRadius: BorderRadius.circular(6)),
+                                  child: Text(g['handoutText'],
+                                      style: const TextStyle(
+                                          fontStyle: FontStyle.italic,
+                                          fontSize: 13)),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                    'Умова знижки / безкоштовно: ${g['freeCondition']}',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.greenAccent)),
+                                const SizedBox(height: 6),
+                                Text('Секрет ДМ: ${g['dmSecret']}',
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.redAccent)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Закрити',
+                      style: TextStyle(color: Colors.amber)),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _openPuzzlesDialog() {
@@ -227,7 +386,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                 children: [
                   Icon(Icons.extension, color: Colors.amber),
                   SizedBox(width: 10),
-                  Text('Загадки та Підказки Ацерерака', style: TextStyle(color: Colors.amber)),
+                  Text('Загадки та Підказки Ацерерака',
+                      style: TextStyle(color: Colors.amber)),
                 ],
               ),
               content: SizedBox(
@@ -241,9 +401,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                         prefixIcon: const Icon(Icons.search),
                         filled: true,
                         fillColor: const Color(0xFF333333),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
-                      onChanged: (val) => setModalState(() => searchPuzzle = val),
+                      onChanged: (val) =>
+                          setModalState(() => searchPuzzle = val),
                     ),
                     const SizedBox(height: 12),
                     Expanded(
@@ -255,37 +417,51 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                             color: const Color(0xFF2E2E2E),
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ExpansionTile(
-                              title: Text(p['title'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
+                              title: Text(p['title'],
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.amber)),
                               subtitle: Text('Категорія: ${p['category']}'),
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.all(12.0),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Container(
                                         width: double.infinity,
                                         padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFF181818),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: Colors.white12),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border:
+                                              Border.all(color: Colors.white12),
                                         ),
                                         child: SelectableText(
                                           p['text'],
-                                          style: const TextStyle(fontSize: 13, height: 1.4, fontStyle: FontStyle.italic),
+                                          style: const TextStyle(
+                                              fontSize: 13,
+                                              height: 1.4,
+                                              fontStyle: FontStyle.italic),
                                         ),
                                       ),
                                       const SizedBox(height: 10),
                                       Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          const Icon(Icons.lightbulb, size: 16, color: Colors.greenAccent),
+                                          const Icon(Icons.lightbulb,
+                                              size: 16,
+                                              color: Colors.greenAccent),
                                           const SizedBox(width: 6),
                                           Expanded(
                                             child: Text(
                                               'Відповідь / Рішення для ДМ: ${p['solution']}',
-                                              style: const TextStyle(fontSize: 12, color: Colors.greenAccent),
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.greenAccent),
                                             ),
                                           ),
                                         ],
@@ -304,7 +480,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
               ),
               actions: [
                 TextButton(
-                  child: const Text('Закрити', style: TextStyle(color: Colors.amber)),
+                  child: const Text('Закрити',
+                      style: TextStyle(color: Colors.amber)),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -333,17 +510,22 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
           children: [
             const Icon(Icons.record_voice_over, color: Colors.amber),
             const SizedBox(width: 10),
-            Text('Чультський слух (d100: $roll)', style: const TextStyle(color: Colors.amber)),
+            Text('Чультський слух (d100: $roll)',
+                style: const TextStyle(color: Colors.amber)),
           ],
         ),
         content: Text(
-          foundRumor != null ? foundRumor['text'] : 'Нічого цікавого не вдалося дізнатися.',
+          foundRumor != null
+              ? foundRumor['text']
+              : 'Нічого цікавого не вдалося дізнатися.',
           style: const TextStyle(fontSize: 15, height: 1.4),
         ),
         actions: [
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade700),
-            child: const Text('Ще один слух', style: TextStyle(color: Colors.black)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade700),
+            child: const Text('Ще один слух',
+                style: TextStyle(color: Colors.black)),
             onPressed: () {
               Navigator.pop(context);
               _rollRumorDialog();
@@ -366,13 +548,20 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         return StatefulBuilder(
           builder: (context, setModalState) {
             final filteredMonsters = _monsters.where((m) {
-              return m['name'].toString().toLowerCase().contains(searchMonster.toLowerCase()) ||
-                  m['type'].toString().toLowerCase().contains(searchMonster.toLowerCase());
+              return m['name']
+                      .toString()
+                      .toLowerCase()
+                      .contains(searchMonster.toLowerCase()) ||
+                  m['type']
+                      .toString()
+                      .toLowerCase()
+                      .contains(searchMonster.toLowerCase());
             }).toList();
 
             return AlertDialog(
               backgroundColor: const Color(0xFF222222),
-              title: const Text('Бестіарій та Статблоки', style: TextStyle(color: Colors.amber)),
+              title: const Text('Бестіарій та Статблоки',
+                  style: TextStyle(color: Colors.amber)),
               content: SizedBox(
                 width: 600,
                 height: 500,
@@ -384,9 +573,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                         prefixIcon: const Icon(Icons.search),
                         filled: true,
                         fillColor: const Color(0xFF333333),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
-                      onChanged: (val) => setModalState(() => searchMonster = val),
+                      onChanged: (val) =>
+                          setModalState(() => searchMonster = val),
                     ),
                     const SizedBox(height: 12),
                     Expanded(
@@ -398,10 +589,15 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                           return Card(
                             color: const Color(0xFF2E2E2E),
                             child: ExpansionTile(
-                              title: Text(m['name'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
-                              subtitle: Text('${m['type']} • CR: ${m['cr']} • КД: ${m['ac']} • ХП: ${m['hp']}'),
+                              title: Text(m['name'],
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.amber)),
+                              subtitle: Text(
+                                  '${m['type']} • CR: ${m['cr']} • КД: ${m['ac']} • ХП: ${m['hp']}'),
                               trailing: IconButton(
-                                icon: const Icon(Icons.shield, color: Colors.redAccent),
+                                icon: const Icon(Icons.shield,
+                                    color: Colors.redAccent),
                                 tooltip: 'Додати в трекер бою',
                                 onPressed: () {
                                   _addMonsterToCombat(m);
@@ -413,18 +609,37 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                                 Padding(
                                   padding: const EdgeInsets.all(12.0),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text('Характеристики: СИЛ ${stats['str']} \vert{} СПР ${stats['dex']} | ТІЛ ${stats['con']} \vert{} ІНТ ${stats['int']} | МУД ${stats['wis']} \vert{} ХАР ${stats['cha']}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                                      Text(
+                                          'Характеристики: СИЛ ${stats['str']} | СПР ${stats['dex']} | ТІЛ ${stats['con']} | ІНТ ${stats['int']} | МУД ${stats['wis']} | ХАР ${stats['cha']}',
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.white70)),
                                       const SizedBox(height: 8),
-                                      const Text('Особливості:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
-                                      ...(m['traits'] as List).map((t) => Text('• $t', style: const TextStyle(fontSize: 12))),
+                                      const Text('Особливості:',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.amber)),
+                                      ...(m['traits'] as List).map((t) => Text(
+                                          '• $t',
+                                          style:
+                                              const TextStyle(fontSize: 12))),
                                       const SizedBox(height: 8),
-                                      const Text('Дії:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
-                                      ...(m['actions'] as List).map((a) => Padding(
-                                        padding: const EdgeInsets.only(bottom: 4.0),
-                                        child: Text('• ${a['name']}:${a['desc']}', style: const TextStyle(fontSize: 12)),
-                                      )),
+                                      const Text('Дії:',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.redAccent)),
+                                      ...(m['actions'] as List)
+                                          .map((a) => Padding(
+                                                padding: const EdgeInsets.only(
+                                                    bottom: 4.0),
+                                                child: Text(
+                                                    '• ${a['name']}: ${a['desc']}',
+                                                    style: const TextStyle(
+                                                        fontSize: 12)),
+                                              )),
                                     ],
                                   ),
                                 ),
@@ -439,7 +654,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
               ),
               actions: [
                 TextButton(
-                  child: const Text('Закрити', style: TextStyle(color: Colors.amber)),
+                  child: const Text('Закрити',
+                      style: TextStyle(color: Colors.amber)),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -452,7 +668,9 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
 
   void _addMonsterToCombat(dynamic monster) {
     final rollInit = (1 + (DateTime.now().microsecondsSinceEpoch % 20));
-    final hp = monster['hp'] is int ? monster['hp'] as int : int.tryParse(monster['hp'].toString()) ?? 30;
+    final hp = monster['hp'] is int
+        ? monster['hp'] as int
+        : int.tryParse(monster['hp'].toString()) ?? 30;
     setState(() {
       _combatants.add(
         Combatant(
@@ -476,7 +694,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF222222),
-        title: const Text('Додати учасника бою', style: TextStyle(color: Colors.amber)),
+        title: const Text('Додати учасника бою',
+            style: TextStyle(color: Colors.amber)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -497,13 +716,16 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
           ],
         ),
         actions: [
-          TextButton(child: const Text('Скасувати'), onPressed: () => Navigator.pop(context)),
+          TextButton(
+              child: const Text('Скасувати'),
+              onPressed: () => Navigator.pop(context)),
           ElevatedButton(
             child: const Text('Додати'),
             onPressed: () {
               if (name.isNotEmpty) {
                 setState(() {
-                  _combatants.add(Combatant(name: name, initiative: init, currentHp: hp, maxHp: hp));
+                  _combatants.add(Combatant(
+                      name: name, initiative: init, currentHp: hp, maxHp: hp));
                   _sortCombatants();
                 });
               }
@@ -535,9 +757,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
 
     setState(() {
       if (found != null) {
-        _lastEncounterResult = '[$roll по d20] ${found['name']}\n\n${found['description']}\n(Загроза: ${found['threat']})';
+        _lastEncounterResult =
+            '[$roll по d20] ${found['name']}\n\n${found['description']}\n(Загроза: ${found['threat']})';
       } else {
-        _lastEncounterResult = '[$roll по d20] Спокійний день. Нічого не сталося.';
+        _lastEncounterResult =
+            '[$roll по d20] Спокійний день. Нічого не сталося.';
       }
     });
     _saveCampaignState();
@@ -548,6 +772,13 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       _currentDay++;
       if (_rationsLeft > 0) _rationsLeft -= 1;
       if (_waterGallonsLeft > 0) _waterGallonsLeft -= 2;
+
+      if (_activeGuide != null) {
+        final guideFee = _activeGuide['costPerDay'] as int? ?? 5;
+        if (_partyGold >= guideFee) {
+          _partyGold -= guideFee;
+        }
+      }
     });
     _rollDailyEncounter();
     _saveCampaignState();
@@ -568,6 +799,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         backgroundColor: const Color(0xFF111111),
         actions: [
           IconButton(
+            icon: const Icon(Icons.person_pin_circle, color: Colors.amber),
+            tooltip: 'Проводники Чульта',
+            onPressed: _openGuidesDialog,
+          ),
+          IconButton(
             icon: const Icon(Icons.extension, color: Colors.amber),
             tooltip: 'Загадки та Підказки',
             onPressed: _openPuzzlesDialog,
@@ -583,7 +819,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
             onPressed: _openBestiaryDialog,
           ),
           IconButton(
-            icon: Icon(_showMap ? Icons.article : Icons.map, color: Colors.amber),
+            icon:
+                Icon(_showMap ? Icons.article : Icons.map, color: Colors.amber),
             tooltip: _showMap ? 'Перейти до опису' : 'Відкрити карту',
             onPressed: () => setState(() => _showMap = !_showMap),
           ),
@@ -597,8 +834,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                 _currentDay = 1;
                 _rationsLeft = 20;
                 _waterGallonsLeft = 30;
+                _partyGold = 150;
+                _activeGuide = null;
                 _selectedBiome = 'jungle_normal';
-                _lastEncounterResult = 'Натисніть "Провести день" або "Кидок зустрічі"';
+                _lastEncounterResult =
+                    'Натисніть "Провести день" або "Кидок зустрічі"';
                 _notesController.clear();
               });
             },
@@ -609,9 +849,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
               children: [
                 const Icon(Icons.calendar_today, size: 18, color: Colors.amber),
                 const SizedBox(width: 8),
-                Text('День подорожі: $_currentDay', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text('День подорожі: $_currentDay',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 IconButton(
-                  icon: const Icon(Icons.add_circle_outline, color: Colors.amber),
+                  icon:
+                      const Icon(Icons.add_circle_outline, color: Colors.amber),
                   onPressed: () {
                     setState(() => _currentDay++);
                     _saveCampaignState();
@@ -639,8 +881,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                       prefixIcon: const Icon(Icons.search, size: 20),
                       filled: true,
                       fillColor: const Color(0xFF333333),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 0, horizontal: 12),
                     ),
                     onChanged: (val) => setState(() => _searchQuery = val),
                   ),
@@ -650,12 +895,17 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                     itemCount: filteredLocations.length,
                     itemBuilder: (context, index) {
                       final item = filteredLocations[index];
-                      final isSelected = _selectedLocation != null && _selectedLocation['id'] == item['id'];
+                      final isSelected = _selectedLocation != null &&
+                          _selectedLocation['id'] == item['id'];
                       return ListTile(
                         selected: isSelected,
                         selectedTileColor: Colors.amber.withOpacity(0.2),
-                        title: Text(item['name'], style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                        subtitle: Text('${item['category']} •${item['region']}', style: const TextStyle(fontSize: 12)),
+                        title: Text(item['name'],
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
+                        subtitle: Text(
+                            '${item['category']} • ${item['region']}',
+                            style: const TextStyle(fontSize: 12)),
                         onTap: () {
                           if (_selectedLocation != null) {
                             _saveCampaignState();
@@ -695,43 +945,65 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                         padding: const EdgeInsets.all(24.0),
                         child: ListView(
                           children: [
-                            Text(_selectedLocation['name'], style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: Colors.amber)),
+                            Text(_selectedLocation['name'],
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(color: Colors.amber)),
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                Chip(label: Text(_selectedLocation['category'])),
+                                Chip(
+                                    label: Text(_selectedLocation['category'])),
                                 const SizedBox(width: 8),
-                                Chip(label: Text('Рівень загрози: ${_selectedLocation['dangerLevel']}')),
+                                Chip(
+                                    label: Text(
+                                        'Рівень загрози: ${_selectedLocation['dangerLevel']}')),
                               ],
                             ),
                             const SizedBox(height: 16),
-                            Text(_selectedLocation['summary'], style: const TextStyle(fontSize: 16, height: 1.4)),
+                            Text(_selectedLocation['summary'],
+                                style:
+                                    const TextStyle(fontSize: 16, height: 1.4)),
                             const Divider(height: 32, color: Colors.white24),
-                            const Text('Ключові особливості:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            const Text('Ключові особливості:',
+                                style: TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 8),
                             ...(_selectedLocation['keyFeatures'] as List).map(
                               (feature) => Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4.0),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.label_important, size: 16, color: Colors.amber),
+                                    const Icon(Icons.label_important,
+                                        size: 16, color: Colors.amber),
                                     const SizedBox(width: 8),
-                                    Expanded(child: Text(feature, style: const TextStyle(fontSize: 15))),
+                                    Expanded(
+                                        child: Text(feature,
+                                            style:
+                                                const TextStyle(fontSize: 15))),
                                   ],
                                 ),
                               ),
                             ),
                             const Divider(height: 32, color: Colors.white24),
-                            const Text('Нотатки Майстра (ДМ):', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber)),
+                            const Text('Нотатки Майстра (ДМ):',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber)),
                             const SizedBox(height: 8),
                             TextField(
                               controller: _notesController,
                               maxLines: 4,
                               decoration: InputDecoration(
-                                hintText: 'Запишіть нотатки для цієї локації (стан НПС, здобич, події)...',
+                                hintText:
+                                    'Запишіть нотатки для цієї локації (стан НПС, здобич, події)...',
                                 filled: true,
                                 fillColor: const Color(0xFF252525),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8)),
                               ),
                               onChanged: (val) => _saveCampaignState(),
                             ),
@@ -785,14 +1057,19 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: const Color(0xFF282828), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(
+                color: const Color(0xFF282828),
+                borderRadius: BorderRadius.circular(8)),
             child: Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Харчі (Раціони):'),
-                    Text('$_rationsLeft дн.', style: TextStyle(color: _rationsLeft < 5 ? Colors.red : Colors.green, fontWeight: FontWeight.bold)),
+                    Text('$_rationsLeft дн.',
+                        style: TextStyle(
+                            color: _rationsLeft < 5 ? Colors.red : Colors.green,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -800,33 +1077,65 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Вода (Галони):'),
-                    Text('$_waterGallonsLeft гал.', style: TextStyle(color: _waterGallonsLeft < 10 ? Colors.red : Colors.blue, fontWeight: FontWeight.bold)),
+                    Text('$_waterGallonsLeft гал.',
+                        style: TextStyle(
+                            color: _waterGallonsLeft < 10
+                                ? Colors.red
+                                : Colors.blue,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Золото загону:'),
+                    Text('$_partyGold зм',
+                        style: const TextStyle(
+                            color: Colors.amber, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                if (_activeGuide != null) ...[
+                  const Divider(color: Colors.white24, height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Проводник:'),
+                      Text('${_activeGuide['name']}',
+                          style: const TextStyle(
+                              color: Colors.amberAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
           const SizedBox(height: 12),
-
           HexNavigationWidget(
             onResourceUpdate: (rationCost, waterCost) {
               setState(() {
                 _rationsLeft = (_rationsLeft - rationCost).clamp(0, 999);
-                _waterGallonsLeft = (_waterGallonsLeft - waterCost).clamp(0, 999);
+                _waterGallonsLeft =
+                    (_waterGallonsLeft - waterCost).clamp(0, 999);
               });
               _saveCampaignState();
             },
           ),
           const SizedBox(height: 12),
-
-          const Text('Поточний біом:', style: TextStyle(fontSize: 12, color: Colors.white70)),
+          const Text('Поточний біом:',
+              style: TextStyle(fontSize: 12, color: Colors.white70)),
           DropdownButton<String>(
             value: _selectedBiome,
             isExpanded: true,
             dropdownColor: const Color(0xFF2A2A2A),
             items: const [
-              DropdownMenuItem(value: 'jungle_normal', child: Text('Джунглі (Нормальна загроза)')),
-              DropdownMenuItem(value: 'undead_high', child: Text('Зона високої нежиті')),
+              DropdownMenuItem(
+                  value: 'jungle_normal',
+                  child: Text('Джунглі (Нормальна загроза)')),
+              DropdownMenuItem(
+                  value: 'undead_high', child: Text('Зона високої нежиті')),
             ],
             onChanged: (val) {
               if (val != null) {
@@ -837,14 +1146,20 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
           ),
           const SizedBox(height: 8),
           ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade700, minimumSize: const Size.fromHeight(38)),
-            icon: const Icon(Icons.arrow_forward, color: Colors.black, size: 18),
-            label: const Text('Провести день (+1 день)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade700,
+                minimumSize: const Size.fromHeight(38)),
+            icon:
+                const Icon(Icons.arrow_forward, color: Colors.black, size: 18),
+            label: const Text('Провести день (+1 день)',
+                style: TextStyle(
+                    color: Colors.black, fontWeight: FontWeight.bold)),
             onPressed: _advanceDay,
           ),
           const SizedBox(height: 6),
           OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(34)),
+            style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(34)),
             icon: const Icon(Icons.casino, size: 16),
             label: const Text('Кидок зустрічі (d20)'),
             onPressed: _rollDailyEncounter,
@@ -852,8 +1167,12 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: const Color(0xFF111111), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white12)),
-            child: Text(_lastEncounterResult, style: const TextStyle(fontSize: 12, height: 1.4)),
+            decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white12)),
+            child: Text(_lastEncounterResult,
+                style: const TextStyle(fontSize: 12, height: 1.4)),
           ),
         ],
       ),
@@ -865,22 +1184,37 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('Прокляття Смерті (Death Curse)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+        const Text('Прокляття Смерті (Death Curse)',
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.redAccent)),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: Colors.red.withOpacity(0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.redAccent.withOpacity(0.4))),
+          decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.redAccent.withOpacity(0.4))),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Втрата Max HP для воскреслих: -$hpLostPerResurrected HP', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+              Text('Втрата Max HP для воскреслих: -$hpLostPerResurrected HP',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.redAccent)),
               const SizedBox(height: 4),
-              const Text('Усі воскреслі істоти втрачають 1 Max HP щодня з початку прокляття.', style: TextStyle(fontSize: 11, color: Colors.white70)),
+              const Text(
+                  'Усі воскреслі істоти втрачають 1 Max HP щодня з початку прокляття.',
+                  style: TextStyle(fontSize: 11, color: Colors.white70)),
             ],
           ),
         ),
         const Divider(height: 24, color: Colors.white24),
-        const Text('Хвороби Чульта', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.amber)),
+        const Text('Хвороби Чульта',
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.amber)),
         const SizedBox(height: 8),
         _buildDiseaseCard(
           'Гортанні п\'явки (Throat Leeches)',
@@ -897,4 +1231,217 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         _buildDiseaseCard(
           'Лихорадка божевільної мавпи (Mad Monkey Fever)',
           'Контакт з магічним туманом Mad Monkey Mist. Con DC 13.',
-          'Бо
+          'Божевілля на 1d6 годин, галюцинації.',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDiseaseCard(String title, String trigger, String effect) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+          color: const Color(0xFF262626),
+          borderRadius: BorderRadius.circular(6)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber,
+                  fontSize: 13)),
+          const SizedBox(height: 2),
+          Text('Тригер: $trigger',
+              style: const TextStyle(fontSize: 11, color: Colors.white70)),
+          const SizedBox(height: 2),
+          Text('Ефект: $effect',
+              style: const TextStyle(fontSize: 11, color: Colors.white)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGodsTab() {
+    return _tricksterGods.isEmpty
+        ? const Center(child: CircularProgressIndicator())
+        : ListView.builder(
+            padding: const EdgeInsets.all(10),
+            itemCount: _tricksterGods.length,
+            itemBuilder: (context, index) {
+              final god = _tricksterGods[index];
+              return Card(
+                color: const Color(0xFF252525),
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ExpansionTile(
+                  title: Text(god['name'],
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber)),
+                  subtitle: Text('${god['animal']} • ${god['alignment']}',
+                      style: const TextStyle(fontSize: 11)),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Сила: ${god['power']}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.greenAccent)),
+                          const SizedBox(height: 4),
+                          Text('Слабкість: ${god['flaw']}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.redAccent)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+  }
+
+  Widget _buildCombatTab() {
+    return Padding(
+      padding: const EdgeInsets.all(10.0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber.shade700),
+                  icon: const Icon(Icons.person_add,
+                      size: 16, color: Colors.black),
+                  label: const Text('Учасник',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold)),
+                  onPressed: _addCustomCombatantDialog,
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.clear_all, color: Colors.redAccent),
+                tooltip: 'Очистити бій',
+                onPressed: () => setState(() => _combatants.clear()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _combatants.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Бій не розпочато.\nДодайте монстра з бестіарію або гравця.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white54),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _combatants.length,
+                    itemBuilder: (context, index) {
+                      final c = _combatants[index];
+                      final isCurrentTurn = _activeCombatantIndex == index;
+
+                      return Card(
+                        color: isCurrentTurn
+                            ? Colors.amber.withOpacity(0.15)
+                            : const Color(0xFF252525),
+                        shape: isCurrentTurn
+                            ? RoundedRectangleBorder(
+                                side: const BorderSide(
+                                    color: Colors.amber, width: 1.5),
+                                borderRadius: BorderRadius.circular(8),
+                              )
+                            : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8.0, vertical: 6.0),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.amber),
+                                alignment: Alignment.center,
+                                child: Text('${c.initiative}',
+                                    style: const TextStyle(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12)),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(c.name,
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: c.isMonster
+                                                ? Colors.redAccent
+                                                : Colors.lightBlueAccent)),
+                                    Text('HP: ${c.currentHp} / ${c.maxHp}',
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.white70)),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.remove,
+                                    size: 16, color: Colors.red),
+                                onPressed: () => setState(() => c.currentHp =
+                                    (c.currentHp - 5).clamp(0, c.maxHp)),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.add,
+                                    size: 16, color: Colors.green),
+                                onPressed: () => setState(() => c.currentHp =
+                                    (c.currentHp + 5).clamp(0, c.maxHp)),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete,
+                                    size: 16, color: Colors.white30),
+                                onPressed: () =>
+                                    setState(() => _combatants.removeAt(index)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          if (_combatants.isNotEmpty) ...[
+            const Divider(color: Colors.white24),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber.shade700,
+                  minimumSize: const Size.fromHeight(36)),
+              icon: const Icon(Icons.skip_next, color: Colors.black, size: 18),
+              label: const Text('Наступний хід',
+                  style: TextStyle(
+                      color: Colors.black, fontWeight: FontWeight.bold)),
+              onPressed: () {
+                setState(() {
+                  _activeCombatantIndex =
+                      (_activeCombatantIndex + 1) % _combatants.length;
+                });
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

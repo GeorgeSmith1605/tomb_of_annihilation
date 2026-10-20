@@ -24,5 +24,6 @@ flutter:
     - assets/data/trickster_gods.json
     - assets/data/monsters.json
     - assets/data/rumors.json
-    - assets/data/puzzles.json  # Додано новий файл
+    - assets/data/puzzles.json
+    - assets/data/guides.json
     - assets/images/
