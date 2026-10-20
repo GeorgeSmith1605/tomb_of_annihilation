@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'widgets/chult_map_widget.dart';
 
 void main() {
@@ -57,8 +58,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
   int _currentDay = 1;
   bool _showMap = false;
 
-  // Монстри та Бестіарій
+  // Монстри, Бестіарій та Слухи
   List<dynamic> _monsters = [];
+  List<dynamic> _rumors = [];
+  final Map<String, String> _locationNotes = {};
+  final TextEditingController _notesController = TextEditingController();
 
   // Подорож та зустрічі
   Map<String, dynamic> _encounterTables = {};
@@ -82,12 +86,67 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     _loadEncounters();
     _loadTricksterGods();
     _loadMonsters();
+    _loadRumors();
+    _loadCampaignState();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _notesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveCampaignState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('currentDay', _currentDay);
+    await prefs.setInt('rationsLeft', _rationsLeft);
+    await prefs.setInt('waterGallonsLeft', _waterGallonsLeft);
+    await prefs.setString('selectedBiome', _selectedBiome);
+    await prefs.setString('lastEncounter', _lastEncounterResult);
+
+    if (_selectedLocation != null) {
+      _locationNotes[_selectedLocation['id']] = _notesController.text;
+      await prefs.setString(
+        'notes_${_selectedLocation['id']}',
+        _notesController.text,
+      );
+    }
+  }
+
+  Future<void> _loadCampaignState() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _currentDay = prefs.getInt('currentDay') ?? 1;
+      _rationsLeft = prefs.getInt('rationsLeft') ?? 20;
+      _waterGallonsLeft = prefs.getInt('waterGallonsLeft') ?? 30;
+      _selectedBiome = prefs.getString('selectedBiome') ?? 'jungle_normal';
+      _lastEncounterResult =
+          prefs.getString('lastEncounter') ??
+          'Натисніть "Провести день" або "Кидок зустрічі"';
+    });
+  }
+
+  Future<void> _loadLocationNote(String locId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedNote = prefs.getString('notes_$locId') ?? '';
+    setState(() {
+      _notesController.text = savedNote;
+    });
+  }
+
+  Future<void> _loadRumors() async {
+    try {
+      final String response = await rootBundle.loadString(
+        'assets/data/rumors.json',
+      );
+      final data = await json.decode(response);
+      setState(() {
+        _rumors = data;
+      });
+    } catch (e) {
+      debugPrint("Error loading rumors: $e");
+    }
   }
 
   Future<void> _loadMonsters() async {
@@ -114,6 +173,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         _locations = data;
         if (_locations.isNotEmpty) {
           _selectedLocation = _locations.first;
+          _loadLocationNote(_selectedLocation['id']);
         }
       });
     } catch (e) {
@@ -147,6 +207,59 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     } catch (e) {
       debugPrint("Error loading trickster gods: $e");
     }
+  }
+
+  void _rollRumorDialog() {
+    final roll = 1 + (DateTime.now().microsecondsSinceEpoch % 100);
+    dynamic foundRumor;
+    for (var r in _rumors) {
+      if (roll >= r['range'][0] && roll <= r['range'][1]) {
+        foundRumor = r;
+        break;
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF222222),
+        title: Row(
+          children: [
+            const Icon(Icons.record_voice_over, color: Colors.amber),
+            const SizedBox(width: 10),
+            Text(
+              'Чультський слух (d100: $roll)',
+              style: const TextStyle(color: Colors.amber),
+            ),
+          ],
+        ),
+        content: Text(
+          foundRumor != null
+              ? foundRumor['text']
+              : 'Нічого цікавого не вдалося дізнатися.',
+          style: const TextStyle(fontSize: 15, height: 1.4),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber.shade700,
+            ),
+            child: const Text(
+              'Ще один слух',
+              style: TextStyle(color: Colors.black),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _rollRumorDialog();
+            },
+          ),
+          TextButton(
+            child: const Text('Закрити', style: TextStyle(color: Colors.amber)),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
   }
 
   void _openBestiaryDialog() {
@@ -218,9 +331,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                                 onPressed: () {
                                   _addMonsterToCombat(m);
                                   Navigator.of(context).pop();
-                                  _tabController.animateTo(
-                                    3,
-                                  ); // Перехід на вкладку Бій
+                                  _tabController.animateTo(3);
                                 },
                               ),
                               children: [
@@ -407,6 +518,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
             '[$roll по d20] Спокійний день. Нічого не сталося.';
       }
     });
+    _saveCampaignState();
   }
 
   void _advanceDay() {
@@ -416,6 +528,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       if (_waterGallonsLeft > 0) _waterGallonsLeft -= 2;
     });
     _rollDailyEncounter();
+    _saveCampaignState();
   }
 
   @override
@@ -433,6 +546,11 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         backgroundColor: const Color(0xFF111111),
         actions: [
           IconButton(
+            icon: const Icon(Icons.record_voice_over, color: Colors.amber),
+            tooltip: 'Генератор слухів (d100)',
+            onPressed: _rollRumorDialog,
+          ),
+          IconButton(
             icon: const Icon(Icons.adb, color: Colors.amber),
             tooltip: 'Швидкий бестіарій',
             onPressed: _openBestiaryDialog,
@@ -444,6 +562,23 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
             ),
             tooltip: _showMap ? 'Перейти до опису' : 'Відкрити карту',
             onPressed: () => setState(() => _showMap = !_showMap),
+          ),
+          IconButton(
+            icon: const Icon(Icons.restart_alt, color: Colors.redAccent),
+            tooltip: 'Скинути прогрес кампанії',
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              setState(() {
+                _currentDay = 1;
+                _rationsLeft = 20;
+                _waterGallonsLeft = 30;
+                _selectedBiome = 'jungle_normal';
+                _lastEncounterResult =
+                    'Натисніть "Провести день" або "Кидок зустрічі"';
+                _notesController.clear();
+              });
+            },
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -460,7 +595,10 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                     Icons.add_circle_outline,
                     color: Colors.amber,
                   ),
-                  onPressed: () => setState(() => _currentDay++),
+                  onPressed: () {
+                    setState(() => _currentDay++);
+                    _saveCampaignState();
+                  },
                   tooltip: 'Наступний день',
                 ),
               ],
@@ -518,7 +656,15 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                           '${item['category']} • ${item['region']}',
                           style: const TextStyle(fontSize: 12),
                         ),
-                        onTap: () => setState(() => _selectedLocation = item),
+                        onTap: () {
+                          if (_selectedLocation != null) {
+                            _saveCampaignState();
+                          }
+                          setState(() {
+                            _selectedLocation = item;
+                          });
+                          _loadLocationNote(item['id']);
+                        },
                       );
                     },
                   ),
@@ -528,15 +674,20 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
           ),
           const VerticalDivider(width: 1, color: Colors.white12),
 
-          // Панель 2: Зміст локації або Карта
+          // Панель 2: Зміст локації + Нотатки ДМ або Карта
           Expanded(
             flex: 3,
             child: _showMap
                 ? ChultMapWidget(
                     locations: _locations,
                     selectedLocation: _selectedLocation,
-                    onSelectLocation: (loc) =>
-                        setState(() => _selectedLocation = loc),
+                    onSelectLocation: (loc) {
+                      if (_selectedLocation != null) {
+                        _saveCampaignState();
+                      }
+                      setState(() => _selectedLocation = loc);
+                      _loadLocationNote(loc['id']);
+                    },
                   )
                 : (_selectedLocation == null
                       ? const Center(
@@ -606,6 +757,30 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                                     ],
                                   ),
                                 ),
+                              ),
+                              const Divider(height: 32, color: Colors.white24),
+                              const Text(
+                                'Нотатки Майстра (ДМ):',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _notesController,
+                                maxLines: 4,
+                                decoration: InputDecoration(
+                                  hintText:
+                                      'Запишіть нотатки для цієї локації (стан НПС, здобич, події)...',
+                                  filled: true,
+                                  fillColor: const Color(0xFF252525),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onChanged: (val) => _saveCampaignState(),
                               ),
                             ],
                           ),
@@ -716,7 +891,10 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
               ),
             ],
             onChanged: (val) {
-              if (val != null) setState(() => _selectedBiome = val);
+              if (val != null) {
+                setState(() => _selectedBiome = val);
+                _saveCampaignState();
+              }
             },
           ),
           const SizedBox(height: 8),
@@ -929,7 +1107,6 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
           );
   }
 
-  // Віджет Вкладки 4: Бій (Combat Tracker)
   Widget _buildCombatTab() {
     return Padding(
       padding: const EdgeInsets.all(10.0),
