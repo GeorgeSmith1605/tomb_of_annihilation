@@ -28,4 +28,7 @@ flutter:
     - assets/data/guides.json
     - assets/data/dinosaurs.json
     - assets/data/factions.json
+    - assets/data/side_quests.json
+    - assets/data/market_items.json
+    - assets/data/dm_reference.json
     - assets/images/

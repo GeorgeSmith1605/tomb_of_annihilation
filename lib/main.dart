@@ -65,10 +65,16 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
   List<dynamic> _guides = [];
   List<dynamic> _dinosaurs = [];
   List<dynamic> _factions = [];
+  List<dynamic> _sideQuests = [];
+  List<dynamic> _marketItems = [];
+  List<dynamic> _dmReference = [];
+  final Map<String, String> _questStatuses = {};
+
   dynamic _activeGuide;
 
   final Map<String, String> _locationNotes = {};
   final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _sessionLogController = TextEditingController();
 
   Map<String, dynamic> _encounterTables = {};
   String _selectedBiome = 'jungle_normal';
@@ -96,6 +102,9 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     _loadGuides();
     _loadDinosaurs();
     _loadFactions();
+    _loadSideQuests();
+    _loadMarketItems();
+    _loadDmReference();
     _loadCampaignState();
   }
 
@@ -103,6 +112,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
   void dispose() {
     _tabController.dispose();
     _notesController.dispose();
+    _sessionLogController.dispose();
     super.dispose();
   }
 
@@ -114,12 +124,17 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     await prefs.setInt('partyGold', _partyGold);
     await prefs.setString('selectedBiome', _selectedBiome);
     await prefs.setString('lastEncounter', _lastEncounterResult);
+    await prefs.setString('sessionLogNotes', _sessionLogController.text);
 
     if (_activeGuide != null) {
       await prefs.setString('activeGuideId', _activeGuide['id']);
     } else {
       await prefs.remove('activeGuideId');
     }
+
+    _questStatuses.forEach((qId, status) async {
+      await prefs.setString('quest_status_$qId', status);
+    });
 
     if (_selectedLocation != null) {
       _locationNotes[_selectedLocation['id']] = _notesController.text;
@@ -138,6 +153,7 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
       _selectedBiome = prefs.getString('selectedBiome') ?? 'jungle_normal';
       _lastEncounterResult = prefs.getString('lastEncounter') ??
           'Натисніть "Провести день" або "Кидок зустрічі"';
+      _sessionLogController.text = prefs.getString('sessionLogNotes') ?? '';
 
       final savedGuideId = prefs.getString('activeGuideId');
       if (savedGuideId != null && _guides.isNotEmpty) {
@@ -145,6 +161,12 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
           (g) => g['id'] == savedGuideId,
           orElse: () => null,
         );
+      }
+
+      for (var q in _sideQuests) {
+        final qId = q['id'].toString();
+        _questStatuses[qId] =
+            prefs.getString('quest_status_$qId') ?? 'Доступний';
       }
     });
   }
@@ -155,6 +177,45 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     setState(() {
       _notesController.text = savedNote;
     });
+  }
+
+  Future<void> _loadDmReference() async {
+    try {
+      final String response =
+          await rootBundle.loadString('assets/data/dm_reference.json');
+      final data = json.decode(response);
+      setState(() {
+        _dmReference = data;
+      });
+    } catch (e) {
+      debugPrint("Error loading DM reference: $e");
+    }
+  }
+
+  Future<void> _loadMarketItems() async {
+    try {
+      final String response =
+          await rootBundle.loadString('assets/data/market_items.json');
+      final data = json.decode(response);
+      setState(() {
+        _marketItems = data;
+      });
+    } catch (e) {
+      debugPrint("Error loading market items: $e");
+    }
+  }
+
+  Future<void> _loadSideQuests() async {
+    try {
+      final String response =
+          await rootBundle.loadString('assets/data/side_quests.json');
+      final data = json.decode(response);
+      setState(() {
+        _sideQuests = data;
+      });
+    } catch (e) {
+      debugPrint("Error loading side quests: $e");
+    }
   }
 
   Future<void> _loadFactions() async {
@@ -276,6 +337,481 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
     } catch (e) {
       debugPrint("Error loading trickster gods: $e");
     }
+  }
+
+  void _openDmReferenceDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return DefaultTabController(
+          length: 2,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF222222),
+            title: const Row(
+              children: [
+                Icon(Icons.menu_book, color: Colors.amber),
+                SizedBox(width: 10),
+                Text('Шпора ДМ та Журнал Сесій',
+                    style: TextStyle(color: Colors.amber)),
+              ],
+            ),
+            content: SizedBox(
+              width: 680,
+              height: 520,
+              child: Column(
+                children: [
+                  const TabBar(
+                    indicatorColor: Colors.amber,
+                    labelColor: Colors.amber,
+                    unselectedLabelColor: Colors.white60,
+                    tabs: [
+                      Tab(text: 'Правила та Шпора'),
+                      Tab(text: 'Лог Подій / Нотатки Сесії'),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        // Вкладка 1: Правила
+                        ListView.builder(
+                          itemCount: _dmReference.length,
+                          itemBuilder: (context, index) {
+                            final ref = _dmReference[index];
+                            final rules = ref['rules'] as List<dynamic>;
+                            return Card(
+                              color: const Color(0xFF2E2E2E),
+                              margin: const EdgeInsets.only(bottom: 10),
+                              child: ExpansionTile(
+                                title: Text(ref['category'],
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.amber)),
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: rules
+                                          .map<Widget>((r) => Padding(
+                                                padding: const EdgeInsets.only(
+                                                    bottom: 6.0),
+                                                child: Text('• $r',
+                                                    style: const TextStyle(
+                                                        fontSize: 13,
+                                                        height: 1.3)),
+                                              ))
+                                          .toList(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+
+                        // Вкладка 2: Нотатки Сесій
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Загальний журнал подій кампанії:',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 13)),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _sessionLogController,
+                                maxLines: null,
+                                expands: true,
+                                textAlignVertical: TextAlignVertical.top,
+                                decoration: InputDecoration(
+                                  hintText:
+                                      'Записуйте тут важливі події кожної сесії (хто загинув, де зупинилися, домовленості з НПС)...',
+                                  filled: true,
+                                  fillColor: const Color(0xFF181818),
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onChanged: (val) => _saveCampaignState(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Закрити',
+                    style: TextStyle(color: Colors.amber)),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openMarketAndLootDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String lootResult =
+            'Натисніть кнопку нижче, щоб згенерувати скарби Чульта.';
+        return DefaultTabController(
+          length: 2,
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              void generateLoot(String CRTier) {
+                final rng = Random();
+                int gold = 0;
+                List<String> items = [];
+
+                if (CRTier == 'low') {
+                  gold = (rng.nextInt(6) + 1) * 10;
+                  final lootTable = [
+                    'Намисто з ікол тиранозавра (25 зм)',
+                    'Старовинна маска Ому з нефриту (50 зм)',
+                    'Флакон з отрутою су-монстра (2 дози)',
+                    'Сувій заклинання: Disguise Self',
+                    'Самоцвіт Агат (10 зм)',
+                  ];
+                  items.add(lootTable[rng.nextInt(lootTable.length)]);
+                } else {
+                  gold = (rng.nextInt(20) + 1) * 50;
+                  final lootTable = [
+                    'Кільце Зими (Ілюзія / Копія)',
+                    'Призрачний ліхтар (Ghost Lantern з духом Старфален)',
+                    'Загадковий куб божества Ому',
+                    'Доспех Скорпиона (Scorpion Armor)',
+                    'Амулет Чорного Черепа (Black Skull Amulet)',
+                  ];
+                  items.add(lootTable[rng.nextInt(lootTable.length)]);
+                }
+
+                setModalState(() {
+                  lootResult =
+                      '💰 Золото: $gold зм\n🎁 Трофеї: ${items.join(', ')}';
+                  _partyGold += gold;
+                });
+                setState(() {});
+                _saveCampaignState();
+              }
+
+              return AlertDialog(
+                backgroundColor: const Color(0xFF222222),
+                title: const Row(
+                  children: [
+                    Icon(Icons.shopping_cart, color: Colors.amber),
+                    SizedBox(width: 10),
+                    Text('Ринок та Генератор Скарбів',
+                        style: TextStyle(color: Colors.amber)),
+                  ],
+                ),
+                content: SizedBox(
+                  width: 700,
+                  height: 520,
+                  child: Column(
+                    children: [
+                      const TabBar(
+                        indicatorColor: Colors.amber,
+                        labelColor: Colors.amber,
+                        unselectedLabelColor: Colors.white60,
+                        tabs: [
+                          Tab(text: 'Ринок Порту Нянзару'),
+                          Tab(text: 'Генератор Скарбів'),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            ListView.builder(
+                              itemCount: _marketItems.length,
+                              itemBuilder: (context, index) {
+                                final item = _marketItems[index];
+                                final cost = item['cost'] as int;
+                                final canAfford = _partyGold >= cost;
+
+                                return Card(
+                                  color: const Color(0xFF2E2E2E),
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ListTile(
+                                    title: Text(item['name'],
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.amber,
+                                            fontSize: 14)),
+                                    subtitle: Text(
+                                        '${item['description']}\nЦіна: $cost зм (${item['unit']})'),
+                                    isThreeLine: true,
+                                    trailing: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: canAfford
+                                            ? Colors.amber.shade700
+                                            : Colors.grey,
+                                      ),
+                                      child: const Text('Купити',
+                                          style: TextStyle(
+                                              color: Colors.black,
+                                              fontWeight: FontWeight.bold)),
+                                      onPressed: canAfford
+                                          ? () {
+                                              setState(() {
+                                                _partyGold -= cost;
+                                                if (item['type'] == 'rations') {
+                                                  _rationsLeft +=
+                                                      item['amount'] as int;
+                                                } else if (item['type'] ==
+                                                    'water') {
+                                                  _waterGallonsLeft +=
+                                                      item['amount'] as int;
+                                                }
+                                              });
+                                              setModalState(() {});
+                                              _saveCampaignState();
+                                            }
+                                          : null,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                    'Оберіть рівень складності / небезпеки:',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14)),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                Colors.green.shade700),
+                                        icon: const Icon(Icons.casino,
+                                            color: Colors.white),
+                                        label: const Text(
+                                            'Низький рівень (CR 0-4)',
+                                            style:
+                                                TextStyle(color: Colors.white)),
+                                        onPressed: () => generateLoot('low'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                Colors.red.shade700),
+                                        icon: const Icon(Icons.auto_awesome,
+                                            color: Colors.white),
+                                        label: const Text(
+                                            'Високий рівень (CR 5+)',
+                                            style:
+                                                TextStyle(color: Colors.white)),
+                                        onPressed: () => generateLoot('high'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF151515),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                        color: Colors.amber.withOpacity(0.5)),
+                                  ),
+                                  child: Text(
+                                    lootResult,
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        height: 1.5,
+                                        color: Colors.amberAccent),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    child: const Text('Закрити',
+                        style: TextStyle(color: Colors.amber)),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _openSideQuestsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF222222),
+              title: const Row(
+                children: [
+                  Icon(Icons.assignment, color: Colors.amber),
+                  SizedBox(width: 10),
+                  Text('Побічні Завдання та Дошка Оголошень',
+                      style: TextStyle(color: Colors.amber)),
+                ],
+              ),
+              content: SizedBox(
+                width: 680,
+                height: 520,
+                child: ListView.builder(
+                  itemCount: _sideQuests.length,
+                  itemBuilder: (context, index) {
+                    final q = _sideQuests[index];
+                    final qId = q['id'].toString();
+                    final currentStatus = _questStatuses[qId] ?? 'Доступний';
+
+                    Color statusColor = Colors.amber;
+                    if (currentStatus == 'Активний')
+                      statusColor = Colors.lightBlueAccent;
+                    if (currentStatus == 'Завершений')
+                      statusColor = Colors.greenAccent;
+
+                    return Card(
+                      color: const Color(0xFF2E2E2E),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ExpansionTile(
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                q['title'],
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber,
+                                    fontSize: 14),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                                border:
+                                    Border.all(color: statusColor, width: 1),
+                              ),
+                              child: Text(
+                                currentStatus,
+                                style: TextStyle(
+                                    color: statusColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Text('${q['location']} • НПС: ${q['npc']}'),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Суть завдання: ${q['summary']}',
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 6),
+                                Text('Деталі: ${q['details']}',
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.white70)),
+                                const SizedBox(height: 6),
+                                Text('Винагорода: ${q['reward']}',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.greenAccent)),
+                                const SizedBox(height: 6),
+                                Text('Примітки для ДМ: ${q['dmNotes']}',
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.redAccent)),
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    const Text('Змінити статус: ',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.white60)),
+                                    DropdownButton<String>(
+                                      value: currentStatus,
+                                      dropdownColor: const Color(0xFF333333),
+                                      style: const TextStyle(
+                                          fontSize: 12, color: Colors.white),
+                                      items: const [
+                                        DropdownMenuItem(
+                                            value: 'Доступний',
+                                            child: Text('Доступний')),
+                                        DropdownMenuItem(
+                                            value: 'Активний',
+                                            child: Text('Активний')),
+                                        DropdownMenuItem(
+                                            value: 'Завершений',
+                                            child: Text('Завершений')),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setState(() {
+                                            _questStatuses[qId] = val;
+                                          });
+                                          setModalState(() {});
+                                          _saveCampaignState();
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Закрити',
+                      style: TextStyle(color: Colors.amber)),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _openFactionsDialog() {
@@ -1091,6 +1627,21 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
         backgroundColor: const Color(0xFF111111),
         actions: [
           IconButton(
+            icon: const Icon(Icons.menu_book, color: Colors.amber),
+            tooltip: 'Шпора ДМ та Журнал Сесій',
+            onPressed: _openDmReferenceDialog,
+          ),
+          IconButton(
+            icon: const Icon(Icons.shopping_cart, color: Colors.amber),
+            tooltip: 'Ринок та Генератор скарбів',
+            onPressed: _openMarketAndLootDialog,
+          ),
+          IconButton(
+            icon: const Icon(Icons.assignment, color: Colors.amber),
+            tooltip: 'Побічні завдання та Дошка оголошень',
+            onPressed: _openSideQuestsDialog,
+          ),
+          IconButton(
             icon: const Icon(Icons.groups, color: Colors.amber),
             tooltip: 'Торгові Принці та Фракції',
             onPressed: _openFactionsDialog,
@@ -1142,6 +1693,8 @@ class _MainDMDesktopScreenState extends State<MainDMDesktopScreen>
                 _lastEncounterResult =
                     'Натисніть "Провести день" або "Кидок зустрічі"';
                 _notesController.clear();
+                _sessionLogController.clear();
+                _questStatuses.clear();
               });
             },
           ),
